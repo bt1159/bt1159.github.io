@@ -90,9 +90,10 @@ function drawDiamond(ctx, centerX, centerY, size, color) {
 
 function drawHLine(ctx, y, color) {
     ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0,y);
-    ctx.lineTo(ctx.width,y);
+    ctx.lineTo(ctx.canvas.width,y);
     ctx.closePath();
     ctx.stroke();
 }
