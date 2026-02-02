@@ -160,7 +160,7 @@ async function getTableData() {
                 (startDates[index] instanceof Date && !isNaN(startDates[index])) ? startDates[index].getTime() : 0,
                 (endDates[index] instanceof Date && !isNaN(endDates[index])) ? endDates[index].getTime() : 0
             ));
-            const availablePixels = data.map((row, index) {
+            const availablePixels = data.map((row, index) => {
                 if (types[index] == "Activity") {
                     return (canvas.width - ctx.measureText(row[titleIndex]).width - 2 * buffer - 5);
                 } else if (types[index] == "Milestone") {
