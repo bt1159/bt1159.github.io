@@ -69,6 +69,14 @@ async function createAndInsertImage() {
     }
 }
 
+function excelDateToJS(excelDate) {
+    // Excel's date system starts 70 years before JS, 
+    // and there's a "leap year bug" in Excel's 1900 logic to account for.
+    let excelDateFixed = excelDate ?? 0;
+    const date = new Date(Math.round((excelDateFixed - 25569) * 86400 * 1000));
+    return date;
+}
+
 async function getTableData() {
     try {
 
@@ -109,8 +117,8 @@ async function getTableData() {
             let data = bodyRange.values;
 
             // Simple Math Setup
-            const startDates = data.map(row => new Date(row[startIndex]));
-            const endDates = data.map(row => new Date(row[endIndex]));
+            const startDates = data.map(row => new Date(excelDateToJS(row[startIndex])));
+            const endDates = data.map(row => new Date(excelDateToJS(row[endIndex])));
             const projectStart = new Date(Math.min(...startDates));
             const projectEnd = new Date(Math.max(...endDates));
             const totalDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
