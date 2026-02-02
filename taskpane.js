@@ -113,18 +113,63 @@ async function getTableData() {
             const typeIndex = headers.indexOf("Type");
             const startIndex = headers.indexOf("Start date");
             const endIndex = headers.indexOf("End date");
+            const titleIndex = headers.indexOf("Titles");
             
             let data = bodyRange.values;
 
             // Simple Math Setup
+            const types = data.map(row => row[typeIndex]);
             const startDates = data.map(row => new Date(excelDateToJS(row[startIndex])));
             const endDates = data.map(row => new Date(excelDateToJS(row[endIndex])));
+            const titles = data.map(row => row[titleIndex]);
             const projectStart = new Date(Math.min(...startDates));
             const projectEnd = new Date(Math.max(...endDates));
             const totalDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
             const pxPerDay = canvas.width / totalDays;
 
-            console.log('pxPerDay: ' + pxPerDay);
+            // Draw each task
+            data.forEach((row, index) => {
+                if (types[index] == "Activity") {
+                    const taskStart = new Date(excelDateToJS(row[startIndex]));
+                    const taskEnd = new Date(excelDateToJS(row[endIndex]));
+                    const duration = (taskEnd - taskStart) / (1000 * 60 * 60 * 24);
+
+                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay;
+                    const y = index * 30 + 10; // 30px height per row
+                    const width = duration * pxPerDay;
+
+                    // Draw the bar
+                    ctx.fillStyle = "#217346"; // Excel Green
+                    ctx.fillRect(x, y, width, 20);
+                    
+                    // Draw the label
+                    ctx.fillStyle = "black";
+                    ctx.fillText(row[titleIndex], x, y - 5);
+                } else if (types[index] == "Milestone") {
+                    const taskStart = new Date(excelDateToJS(row[startIndex]));
+                    // const taskEnd = new Date(excelDateToJS(row[endIndex]));
+                    // const duration = (taskEnd - taskStart) / (1000 * 60 * 60 * 24);
+                    const duration = 5;
+
+                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay;
+                    const y = index * 30 + 10; // 30px height per row
+                    const width = duration * pxPerDay;
+
+                    // Draw the bar
+                    ctx.fillStyle = "#ff7346";
+                    ctx.fillRect(x, y, width, 20);
+                    
+                    // Draw the label
+                    ctx.fillStyle = "black";
+                    ctx.fillText(row[titleIndex], x, y - 5);
+
+                }
+            });
+
+            // Convert to image and push to Excel
+            const image = canvas.toDataURL("image/png").replace(/^data:image\/(png|jpg);base64,/, "");
+            sheet.shapes.addImage(image);
+            await context.sync();
         });
     } catch (error) {
         console.error(error);
