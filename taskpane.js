@@ -77,6 +77,17 @@ function excelDateToJS(excelDate) {
     return date;
 }
 
+function drawDiamond(ctx, centerX, centerY, size, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - (size / 2));      // Top
+    ctx.lineTo(centerX + (size / 2), centerY);      // Right
+    ctx.lineTo(centerX, centerY + (size / 2));      // Bottom
+    ctx.lineTo(centerX - (size / 2), centerY);      // Left
+    ctx.closePath();
+    ctx.fill();
+}
+
 async function getTableData() {
     try {
 
@@ -147,17 +158,11 @@ async function getTableData() {
                     ctx.fillText(row[titleIndex], x, y - 5);
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
-                    // const taskEnd = new Date(excelDateToJS(row[endIndex]));
-                    // const duration = (taskEnd - taskStart) / (1000 * 60 * 60 * 24);
-                    const duration = 5;
-
+                    
+                    const size = 5 * pxPerDay
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay;
                     const y = index * 30 + 10; // 30px height per row
-                    const width = duration * pxPerDay;
-
-                    // Draw the bar
-                    ctx.fillStyle = "#ff7346";
-                    ctx.fillRect(x, y, width, 20);
+                    drawDiamond(ctx,x - size/2,y,size,"orange");
                     
                     // Draw the label
                     ctx.fillStyle = "black";
