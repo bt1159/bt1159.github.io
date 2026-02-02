@@ -74,8 +74,7 @@ async function getTableData() {
 
         await Excel.run(async (context) => {
             let sheet = context.workbook.worksheets.getActiveWorksheet();
-            let tables = sheet.tables;
-            let dateTable = tables[0];
+            let dateTable = sheet.tables.getItemAt(0);
 
             // Get data from the header row.
             let headerRange = dateTable.getHeaderRowRange().load("values");
