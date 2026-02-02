@@ -156,7 +156,7 @@ async function getTableData() {
             const projectEnd = new Date(Math.max(...endDates));
             const totalDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
             ctx.font = "14px Arial";
-            const theoreticalPxPerDay = data.map((row, index) => (canvas.width - ctx.measureText(row[titleIndex]).width)/((endDates[index] - projectStart) / (1000 * 60 * 60 * 24)));
+            const theoreticalPxPerDay = data.map((row, index) => (canvas.width - ctx.measureText(row[titleIndex]).width)/((Math.max([endDates[index],startDates[index]]) - projectStart) / (1000 * 60 * 60 * 24)));
             // const pxPerDay = (canvas.width - 2 * buffer) / totalDays;
             const pxPerDay = Math.min(...theoreticalPxPerDay);
 
