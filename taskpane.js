@@ -98,12 +98,12 @@ function drawHLine(ctx, y, color) {
     ctx.stroke();
 }
 
-function drawVLine(ctx, x, y0, y1, color) {
+function drawVLine(ctx, x, y0, y1, color, width) {
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = width;
     ctx.beginPath();
     ctx.moveTo(x,y0);
-    ctx.lineTo(ctx.canvas.height,y1);
+    ctx.lineTo(x,y1);
     ctx.closePath();
     ctx.stroke();
 }
@@ -165,6 +165,8 @@ async function getTableData() {
             const titles = data.map(row => row[titleIndex]);
             const projectStart = new Date(Math.min(...startDates));
             const projectEnd = new Date(Math.max(...endDates));
+            const rangeStart = new Date(projectStart.getFullYear(),projectStart.getMonth(),1);
+            const rangeEnd = projectEnd.getDate() == 1 ? new Date(projectEnd) : new Date(projectEnd.getFullYear(),projectEnd.getMonth() + 1,1);
             const totalDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
             ctx.font = "14px Arial";
             let maxTimestamps = data.map((row, index) => Math.max(
@@ -180,20 +182,33 @@ async function getTableData() {
                     return 0;
                 }
             });
-            const requiredDayWidth = data.map((row, index) => (maxTimestamps[index] - projectStart) / (1000 * 60 * 60 * 24));
+            const requiredDayWidth = data.map((row, index) => (maxTimestamps[index] - rangeStart) / (1000 * 60 * 60 * 24));
             const theoreticalPxPerDay = availablePixels.map((row, index) => row / requiredDayWidth[index]);
             const pxPerDay = Math.min(...theoreticalPxPerDay);
-            
-            const yearDiff = projectEnd.getFullYear() - projectStart.getFullYear();
-            const monthDiff = projectEnd.getMonth() - projectStart.getMonth();
+
+            console.log('projectEnd: ' + projectEnd);
+            const yearDiff = rangeEnd.getFullYear() - rangeStart.getFullYear();
+            console.log('yearDiff: ' + yearDiff);
+            const monthDiff = rangeEnd.getMonth() - rangeStart.getMonth() + 1;
+            console.log('monthDiff: ' + monthDiff);
             const noMonths = (yearDiff * 12) + monthDiff;
-            const month0 = projectStart.getDate() == 1 ? projectStart.getMonth() : projectStart.getMonth() + 1;
+            console.log('noMonths: ' + noMonths);
 
             for (let m = 0; m < noMonths; m++) {
-                const month = month0 + m;
-                const thisDate = new Date(projectStart.getFullYear(),month,1);
-                const x = (thisDate - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
-                drawVLine(ctx,x,0,ganttBottom,"grey");
+                const month = rangeStart.getMonth() + m;
+                const thisDate = new Date(rangeStart.getFullYear(),month,1);
+                const x = (thisDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                const width = month == 12 ? 2 : 1;
+                const color = month == 12 ? "rgb(0, 0, 0)" : "rgb(180, 180, 180)";
+                drawVLine(ctx,x,0,ganttBottom, color, width);
+            }
+
+            if ( new Date().now > rangeStart && new Date().now < rangeEnd) {
+                const thisDate = new Date().now;
+                const x = (thisDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                const width = 1;
+                const color = "rgb(255, 0, 0)";
+                drawVLine(ctx,x,0,ganttBottom, color, width);
             }
 
 
@@ -205,7 +220,7 @@ async function getTableData() {
                     const duration = (taskEnd - taskStart) / (1000 * 60 * 60 * 24);
 
                     
-                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                    const x = (taskStart - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
                     const y = index * templateHeight; // 30px height per row
                     const width = duration * pxPerDay;
 
@@ -234,7 +249,7 @@ async function getTableData() {
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
                     const size = size0;
-                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - (size / 2);
+                    const x = (taskStart - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - (size / 2);
                     const y = index * templateHeight; // 30px height per row
                     drawDiamond(ctx,x,y,size,"orange");
                     // drawHLine(ctx,y,"red");
