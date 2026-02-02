@@ -169,7 +169,7 @@ async function getTableData() {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
                     const size = size0;
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - size/2;
-                    const y = index * 30 + size/2; // 30px height per row
+                    const y = index * 30 + buffer; // 30px height per row
                     drawDiamond(ctx,x,y,size,"orange");
                     
                     // Draw the label
