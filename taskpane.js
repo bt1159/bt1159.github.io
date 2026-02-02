@@ -113,7 +113,7 @@ async function getTableData() {
             const typeIndex = headers.indexOf("Type");
             const startIndex = headers.indexOf("Start date");
             const endIndex = headers.indexOf("End date");
-            const titleIndex = headers.indexOf("Titles");
+            const titleIndex = headers.indexOf("Title");
             
             let data = bodyRange.values;
 
