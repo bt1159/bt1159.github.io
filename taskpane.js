@@ -159,7 +159,7 @@ async function getTableData() {
             let maxTimestamps = data.map((row, index) => Math.max(
                 (startDates[index] instanceof Date && !isNaN(startDates[index])) ? startDates[index].getTime() : 0,
                 (endDates[index] instanceof Date && !isNaN(endDates[index])) ? endDates[index].getTime() : 0
-            );
+            ));
             const theoreticalPxPerDay = data.map((row, index) => (canvas.width - ctx.measureText(row[titleIndex]).width)/((maxTimestamps[index] - projectStart) / (1000 * 60 * 60 * 24)));
             // const pxPerDay = (canvas.width - 2 * buffer) / totalDays;
             const pxPerDay = Math.min(...theoreticalPxPerDay);
