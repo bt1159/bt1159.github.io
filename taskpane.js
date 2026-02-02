@@ -144,6 +144,8 @@ async function getTableData() {
             
             const size0 = 20;
             const buffer = size0;
+            const lineBuffer = 5;
+            const templateHeight = size0 + lineBuffer;
 
             // Simple Math Setup
             const types = data.map(row => row[typeIndex]);
@@ -165,7 +167,7 @@ async function getTableData() {
 
                     
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
-                    const y = index * 30; // 30px height per row
+                    const y = index * templateHeight; // 30px height per row
                     const width = duration * pxPerDay;
 
                     drawHLine(ctx,y,"red");
@@ -175,21 +177,21 @@ async function getTableData() {
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x + width + 5, y);
-                    drawHLine(ctx,y,"blue");
+                    ctx.fillText(row[titleIndex], x + width + 5, y + size0);
+                    drawHLine(ctx,y + size0,"blue");
 
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
                     const size = size0;
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - (size / 2);
-                    const y = index * 30; // 30px height per row
+                    const y = index * templateHeight; // 30px height per row
                     drawDiamond(ctx,x,y,size,"orange");
                     drawHLine(ctx,y,"red");
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x + size + 5, y);
-                    drawHLine(ctx,y,"blue");
+                    ctx.fillText(row[titleIndex], x + size + 5, y + size0);
+                    drawHLine(ctx,y + size0,"blue");
 
                 }
             });
