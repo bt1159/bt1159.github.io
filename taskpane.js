@@ -177,7 +177,19 @@ async function getTableData() {
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x + width + 5, y + size0);
+                    ctx.font = "14px Arial";
+                    ctx.textBaseline = "middle";
+                    const title = row[titleIndex];
+                    const metrics = ctx.measureText(title);
+                    const textWidth = metrics.width;
+                    if (x + width + 5 + textWidth < ctx.canvas.width) {
+                        ctx.fillText(title, x + width + 5, y + size0 / 2);
+                    } elseif (textWidth + 5 < x) {
+                        ctx.fillText(title, x - textWidth - 5, y + size0 / 2);
+                    } else {
+                        ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
+                    }
+                    
                     drawHLine(ctx,y + size0,"blue");
 
                 } else if (types[index] == "Milestone") {
@@ -190,7 +202,18 @@ async function getTableData() {
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x + size + 5, y + size0);
+                    ctx.font = "14px Arial";
+                    ctx.textBaseline = "middle";
+                    const title = row[titleIndex];
+                    const metrics = ctx.measureText(title);
+                    const textWidth = metrics.width;
+                    if (x + size + 5 + textWidth < ctx.canvas.width) {
+                        ctx.fillText(title, x + size + 5, y + size0 / 2);
+                    } elseif (textWidth + 5 < x) {
+                        ctx.fillText(title, x - textWidth - 5, y + size0 / 2);
+                    } else {
+                        ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
+                    }
                     drawHLine(ctx,y + size0,"blue");
 
                 }
