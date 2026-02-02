@@ -98,6 +98,16 @@ function drawHLine(ctx, y, color) {
     ctx.stroke();
 }
 
+function drawVLine(ctx, x, y0, y1, color) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x,y0);
+    ctx.lineTo(ctx.canvas.height,y1);
+    ctx.closePath();
+    ctx.stroke();
+}
+
 async function getTableData() {
     try {
 
@@ -118,6 +128,10 @@ async function getTableData() {
             let rowRange = dateTable.rows.getItemAt(1).load("values");
 
             //Canvas setup
+            const size0 = 20;
+            const buffer = size0;
+            const lineBuffer = 5;
+            const templateHeight = size0 + lineBuffer;
             const canvas = document.getElementById("myCanvas");
             const ctx = canvas.getContext("2d");
 
@@ -139,13 +153,10 @@ async function getTableData() {
             const titleIndex = headers.indexOf("Title");
             
             let data = bodyRange.values;
+            const ganttBottom = templateHeight * data.length;
 
             // Canvas math
             
-            const size0 = 20;
-            const buffer = size0;
-            const lineBuffer = 5;
-            const templateHeight = size0 + lineBuffer;
 
             // Simple Math Setup
             const types = data.map(row => row[typeIndex]);
@@ -171,8 +182,20 @@ async function getTableData() {
             });
             const requiredDayWidth = data.map((row, index) => (maxTimestamps[index] - projectStart) / (1000 * 60 * 60 * 24));
             const theoreticalPxPerDay = availablePixels.map((row, index) => row / requiredDayWidth[index]);
-            // const pxPerDay = (canvas.width - 2 * buffer) / totalDays;
             const pxPerDay = Math.min(...theoreticalPxPerDay);
+
+            
+            const yearDiff = projectEnd.getFullYear() - projectStart.getFullYear();
+            const monthDiff = projectEnd.getMonth() - projectStart.getMonth();
+            const noMonths = (yearDiff * 12) + monthDiff;
+            const month0 = projectStart.getDate() == 1 ? projectStart.getMonth() : projectStart.getMonth() + 1;
+
+            for (let m = 0; m < noMonths; m++) {
+                const month = month0 + m;
+                const thisDate = new Date(projectStart.getFullYear(),month,1);
+                const x = (thisDate - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                drawVLine(ctx,x,0,ganttBottom,"grey");
+            }
 
 
             // Draw each task
@@ -187,7 +210,7 @@ async function getTableData() {
                     const y = index * templateHeight; // 30px height per row
                     const width = duration * pxPerDay;
 
-                    drawHLine(ctx,y,"red");
+                    // drawHLine(ctx,y,"red");
                     // Draw the bar
                     ctx.fillStyle = "#217346"; // Excel Green
                     ctx.fillRect(x, y, width, size0);
@@ -207,7 +230,7 @@ async function getTableData() {
                         ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
                     }
                     
-                    drawHLine(ctx,y + size0,"blue");
+                    // drawHLine(ctx,y + size0,"blue");
 
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
@@ -215,7 +238,7 @@ async function getTableData() {
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - (size / 2);
                     const y = index * templateHeight; // 30px height per row
                     drawDiamond(ctx,x,y,size,"orange");
-                    drawHLine(ctx,y,"red");
+                    // drawHLine(ctx,y,"red");
                     
                     // Draw the label
                     ctx.fillStyle = "black";
@@ -231,7 +254,7 @@ async function getTableData() {
                     } else {
                         ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
                     }
-                    drawHLine(ctx,y + size0,"blue");
+                    // drawHLine(ctx,y + size0,"blue");
 
                 }
             });
