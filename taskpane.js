@@ -160,7 +160,17 @@ async function getTableData() {
                 (startDates[index] instanceof Date && !isNaN(startDates[index])) ? startDates[index].getTime() : 0,
                 (endDates[index] instanceof Date && !isNaN(endDates[index])) ? endDates[index].getTime() : 0
             ));
-            const theoreticalPxPerDay = data.map((row, index) => (canvas.width - ctx.measureText(row[titleIndex]).width)/((maxTimestamps[index] - projectStart) / (1000 * 60 * 60 * 24)));
+            const availablePixels = data.map((row, index) {
+                if (types[index] == "Activity") {
+                    return (canvas.width - ctx.measureText(row[titleIndex]).width - 2 * buffer - 5);
+                } else if (types[index] == "Milestone") {
+                    return (canvas.width - ctx.measureText(row[titleIndex]).width - 2 * buffer - 5 + size0 / 2);
+                } else {
+                    return 0;
+                }
+            });
+            const requiredDayWidth = data.map((row, index) => (maxTimestamps[index] - projectStart) / (1000 * 60 * 60 * 24));
+            const theoreticalPxPerDay = availablePixels.map((row, index) => row / requiredDayWidth[index]);
             // const pxPerDay = (canvas.width - 2 * buffer) / totalDays;
             const pxPerDay = Math.min(...theoreticalPxPerDay);
 
