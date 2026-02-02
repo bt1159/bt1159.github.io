@@ -77,13 +77,13 @@ function excelDateToJS(excelDate) {
     return date;
 }
 
-function drawDiamond(ctx, centerX, centerY, size, color) {
+function drawDiamond(ctx, topLX, topLY, size, color) {
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(centerX, centerY - (size / 2));      // Top
-    ctx.lineTo(centerX + (size / 2), centerY);      // Right
-    ctx.lineTo(centerX, centerY + (size / 2));      // Bottom
-    ctx.lineTo(centerX - (size / 2), centerY);      // Left
+    ctx.moveTo(topLX + (size / 2), topLY);      // Top
+    ctx.lineTo(topLX, topLY + (size / 2));      // Right
+    ctx.lineTo(topLX + (size / 2), topLY + size));      // Bottom
+    ctx.lineTo(topLX + size, topLY + (size / 2));      // Left
     ctx.closePath();
     ctx.fill();
 }
@@ -165,7 +165,7 @@ async function getTableData() {
 
                     
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
-                    const y = index * 30 + buffer; // 30px height per row
+                    const y = index * 30; // 30px height per row
                     const width = duration * pxPerDay;
 
                     drawHLine(ctx,y,"red");
@@ -175,21 +175,21 @@ async function getTableData() {
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x + 5, y + size0/2);
-                    drawHLine(ctx,y + size0/2,"blue");
+                    ctx.fillText(row[titleIndex], x + width + 5, y);
+                    drawHLine(ctx,y,"blue");
 
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
                     const size = size0;
-                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - size/2;
-                    const y = index * 30 + buffer; // 30px height per row
+                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - (size / 2);
+                    const y = index * 30; // 30px height per row
                     drawDiamond(ctx,x,y,size,"orange");
                     drawHLine(ctx,y,"red");
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x + size/2 + 5, y + size/2);
-                    drawHLine(ctx,y + size/2,"blue");
+                    ctx.fillText(row[titleIndex], x + size + 5, y);
+                    drawHLine(ctx,y,"blue");
 
                 }
             });
