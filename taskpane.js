@@ -155,18 +155,18 @@ async function getTableData() {
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x, y - 5);
+                    ctx.fillText(row[titleIndex], x + 5, y + 10);
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
                     
-                    const size = 5 * pxPerDay
+                    const size = 20;
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay;
                     const y = index * 30 + 10; // 30px height per row
                     drawDiamond(ctx,x - size/2,y,size,"orange");
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x, y - 5);
+                    ctx.fillText(row[titleIndex], x + 5, y + 10);
 
                 }
             });
