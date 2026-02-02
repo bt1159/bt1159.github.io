@@ -68,3 +68,30 @@ async function createAndInsertImage() {
         console.error(error);
     }
 }
+
+await Excel.run(async (context) => {
+    let sheet = context.workbook.worksheets.getActiveWorksheet();
+    let dateTable = sheet.tables[0];
+
+    // Get data from the header row.
+    let headerRange = expensesTable.getHeaderRowRange().load("values");
+
+    // Get data from the table.
+    let bodyRange = expensesTable.getDataBodyRange().load("values");
+
+    // Get data from a single column.
+    let columnRange = expensesTable.columns.getItem("Merchant").getDataBodyRange().load("values");
+
+    // Get data from a single row.
+    let rowRange = expensesTable.rows.getItemAt(1).load("values");
+
+    // Sync to populate proxy objects with data from Excel.
+    await context.sync();
+
+    let headerValues = headerRange.values;
+    let bodyValues = bodyRange.values;
+    let merchantColumnValues = columnRange.values;
+    let secondRowValues = rowRange.values;
+
+    console.log('headerValues: ' + headerValues);
+});
