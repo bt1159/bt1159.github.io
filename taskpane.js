@@ -88,6 +88,15 @@ function drawDiamond(ctx, centerX, centerY, size, color) {
     ctx.fill();
 }
 
+function drawHLine(ctx, y, color) {
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(ctx.width,y);
+    ctx.closePath();
+    ctx.stroke();
+}
+
 async function getTableData() {
     try {
 
@@ -153,10 +162,12 @@ async function getTableData() {
                     const taskEnd = new Date(excelDateToJS(row[endIndex]));
                     const duration = (taskEnd - taskStart) / (1000 * 60 * 60 * 24);
 
+                    
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
                     const y = index * 30 + buffer; // 30px height per row
                     const width = duration * pxPerDay;
 
+                    drawHLine(ctx,y,"red");
                     // Draw the bar
                     ctx.fillStyle = "#217346"; // Excel Green
                     ctx.fillRect(x, y, width, size0);
@@ -164,6 +175,7 @@ async function getTableData() {
                     // Draw the label
                     ctx.fillStyle = "black";
                     ctx.fillText(row[titleIndex], x + 5, y + size0/2);
+                    drawHLine(ctx,y + size0/2,"blue");
 
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
@@ -171,10 +183,12 @@ async function getTableData() {
                     const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - size/2;
                     const y = index * 30 + buffer; // 30px height per row
                     drawDiamond(ctx,x,y,size,"orange");
+                    drawHLine(ctx,y,"red");
                     
                     // Draw the label
                     ctx.fillStyle = "black";
                     ctx.fillText(row[titleIndex], x + size/2 + 5, y + size/2);
+                    drawHLine(ctx,y + size/2,"blue");
 
                 }
             });
