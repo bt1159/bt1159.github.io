@@ -184,7 +184,7 @@ async function getTableData() {
                     const textWidth = metrics.width;
                     if (x + width + 5 + textWidth < ctx.canvas.width) {
                         ctx.fillText(title, x + width + 5, y + size0 / 2);
-                    } elseif (textWidth + 5 < x) {
+                    } else if (textWidth + 5 < x) {
                         ctx.fillText(title, x - textWidth - 5, y + size0 / 2);
                     } else {
                         ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
@@ -209,7 +209,7 @@ async function getTableData() {
                     const textWidth = metrics.width;
                     if (x + size + 5 + textWidth < ctx.canvas.width) {
                         ctx.fillText(title, x + size + 5, y + size0 / 2);
-                    } elseif (textWidth + 5 < x) {
+                    } else if (textWidth + 5 < x) {
                         ctx.fillText(title, x - textWidth - 5, y + size0 / 2);
                     } else {
                         ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
