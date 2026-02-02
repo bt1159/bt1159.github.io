@@ -82,8 +82,8 @@ async function getTableData() {
             // Get data from the table.
             let bodyRange = dateTable.getDataBodyRange().load("values");
 
-            // Get data from a single column.
-            let columnRange = dateTable.columns.getItem("Merchant").getDataBodyRange().load("values");
+            // // Get data from a single column.
+            // let columnRange = dateTable.columns.getItem("Merchant").getDataBodyRange().load("values");
 
             // Get data from a single row.
             let rowRange = dateTable.rows.getItemAt(1).load("values");
@@ -93,7 +93,7 @@ async function getTableData() {
 
             let headerValues = headerRange.values;
             let bodyValues = bodyRange.values;
-            let merchantColumnValues = columnRange.values;
+            // let merchantColumnValues = columnRange.values;
             let secondRowValues = rowRange.values;
 
             console.log('headerValues: ' + headerValues);
