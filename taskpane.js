@@ -77,16 +77,16 @@ async function getTableData() {
             let dateTable = sheet.tables[0];
 
             // Get data from the header row.
-            let headerRange = expensesTable.getHeaderRowRange().load("values");
+            let headerRange = dateTable.getHeaderRowRange().load("values");
 
             // Get data from the table.
-            let bodyRange = expensesTable.getDataBodyRange().load("values");
+            let bodyRange = dateTable.getDataBodyRange().load("values");
 
             // Get data from a single column.
-            let columnRange = expensesTable.columns.getItem("Merchant").getDataBodyRange().load("values");
+            let columnRange = dateTable.columns.getItem("Merchant").getDataBodyRange().load("values");
 
             // Get data from a single row.
-            let rowRange = expensesTable.rows.getItemAt(1).load("values");
+            let rowRange = dateTable.rows.getItemAt(1).load("values");
 
             // Sync to populate proxy objects with data from Excel.
             await context.sync();
