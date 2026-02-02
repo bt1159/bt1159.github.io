@@ -82,7 +82,7 @@ function drawDiamond(ctx, topLX, topLY, size, color) {
     ctx.beginPath();
     ctx.moveTo(topLX + (size / 2), topLY);      // Top
     ctx.lineTo(topLX, topLY + (size / 2));      // Right
-    ctx.lineTo(topLX + (size / 2), topLY + size));      // Bottom
+    ctx.lineTo(topLX + (size / 2), topLY + size);      // Bottom
     ctx.lineTo(topLX + size, topLY + (size / 2));      // Left
     ctx.closePath();
     ctx.fill();
