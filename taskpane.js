@@ -183,7 +183,6 @@ async function getTableData() {
             const requiredDayWidth = data.map((row, index) => (maxTimestamps[index] - projectStart) / (1000 * 60 * 60 * 24));
             const theoreticalPxPerDay = availablePixels.map((row, index) => row / requiredDayWidth[index]);
             const pxPerDay = Math.min(...theoreticalPxPerDay);
-
             
             const yearDiff = projectEnd.getFullYear() - projectStart.getFullYear();
             const monthDiff = projectEnd.getMonth() - projectStart.getMonth();
