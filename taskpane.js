@@ -28,3 +28,43 @@ async function insertText() {
         console.error("Error: " + error);
     }
 }
+
+async function createAndInsertImage() {
+    try {
+        await Excel.run(async (context) => {
+            // 1. Get a value from cell A1 to use in our image
+            const sheet = context.workbook.worksheets.getActiveWorksheet();
+            const range = sheet.getRange("A1");
+            range.load("values");
+            await context.sync();
+            
+            const cellValue = range.values[0][0];
+
+            // 2. Draw on the Canvas
+            const canvas = document.getElementById("myCanvas");
+            const ctx = canvas.getContext("2d");
+            
+            // Background
+            ctx.fillStyle = "#4CAF50"; // Excel Green
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Text
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText("Value: " + cellValue, 10, 50);
+
+            // 3. Convert Canvas to Base64 Image String
+            // We strip the header "data:image/png;base64," because Excel just wants the raw code
+            const fullDataUrl = canvas.toDataURL("image/png");
+            const base64Image = fullDataUrl.replace(/^data:image\/(png|jpg);base64,/, "");
+
+            // 4. Insert the Image into the Sheet
+            sheet.shapes.addImage(base64Image);
+            
+            await context.sync();
+            console.log("Image inserted!");
+        });
+    } catch (error) {
+        console.error(error);
+    }
+}
