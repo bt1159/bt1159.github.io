@@ -93,8 +93,6 @@ async function getTableData() {
 
         await Excel.run(async (context) => {
             let sheet = context.workbook.worksheets.getActiveWorksheet();
-            const canvas = document.getElementById("myCanvas");
-            const ctx = canvas.getContext("2d");
             let dateTable = sheet.tables.getItemAt(0);
 
             // Get data from the header row.
@@ -108,6 +106,10 @@ async function getTableData() {
 
             // Get data from a single row.
             let rowRange = dateTable.rows.getItemAt(1).load("values");
+
+            //Canvas setup
+            const canvas = document.getElementById("myCanvas");
+            const ctx = canvas.getContext("2d");
 
             // Sync to populate proxy objects with data from Excel.
             await context.sync();
@@ -128,6 +130,11 @@ async function getTableData() {
             
             let data = bodyRange.values;
 
+            // Canvas math
+            
+            const size0 = 20;
+            const buffer = size0;
+
             // Simple Math Setup
             const types = data.map(row => row[typeIndex]);
             const startDates = data.map(row => new Date(excelDateToJS(row[startIndex])));
@@ -136,7 +143,8 @@ async function getTableData() {
             const projectStart = new Date(Math.min(...startDates));
             const projectEnd = new Date(Math.max(...endDates));
             const totalDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
-            const pxPerDay = canvas.width / totalDays;
+            const pxPerDay = (canvas.width - 2 * buffer) / totalDays;
+
 
             // Draw each task
             data.forEach((row, index) => {
@@ -145,28 +153,28 @@ async function getTableData() {
                     const taskEnd = new Date(excelDateToJS(row[endIndex]));
                     const duration = (taskEnd - taskStart) / (1000 * 60 * 60 * 24);
 
-                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay;
-                    const y = index * 30 + 10; // 30px height per row
+                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                    const y = index * 30 + buffer; // 30px height per row
                     const width = duration * pxPerDay;
 
                     // Draw the bar
                     ctx.fillStyle = "#217346"; // Excel Green
-                    ctx.fillRect(x, y, width, 20);
+                    ctx.fillRect(x, y, width, size0);
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x + 5, y + 10);
+                    ctx.fillText(row[titleIndex], x + 5, y + size0/2);
+
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
-                    
-                    const size = 20;
-                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay;
-                    const y = index * 30 + 10; // 30px height per row
-                    drawDiamond(ctx,x - size/2,y,size,"orange");
+                    const size = size0;
+                    const x = (taskStart - projectStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - size/2;
+                    const y = index * 30 + size/2; // 30px height per row
+                    drawDiamond(ctx,x,y,size,"orange");
                     
                     // Draw the label
                     ctx.fillStyle = "black";
-                    ctx.fillText(row[titleIndex], x + 5, y + 10);
+                    ctx.fillText(row[titleIndex], x + size/2 + 5, y + size/2);
 
                 }
             });
