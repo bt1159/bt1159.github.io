@@ -74,6 +74,8 @@ async function getTableData() {
 
         await Excel.run(async (context) => {
             let sheet = context.workbook.worksheets.getActiveWorksheet();
+            const canvas = document.getElementById("myCanvas");
+            const ctx = canvas.getContext("2d");
             let dateTable = sheet.tables.getItemAt(0);
 
             // Get data from the header row.
@@ -91,12 +93,30 @@ async function getTableData() {
             // Sync to populate proxy objects with data from Excel.
             await context.sync();
 
-            let headerValues = headerRange.values;
-            let bodyValues = bodyRange.values;
-            // let merchantColumnValues = columnRange.values;
-            let secondRowValues = rowRange.values;
+            // let headerValues = headerRange.values;
+            // let bodyValues = bodyRange.values;
+            // // let merchantColumnValues = columnRange.values;
+            // let secondRowValues = rowRange.values;
 
-            console.log('headerValues: ' + headerValues);
+            // 1. Get the 1D array of headers from the 2D array
+            const headers = headerRange.values[0]; 
+
+            // 2. Use the standard JS indexOf method
+            const typeIndex = headers.indexOf("Type");
+            const startIndex = headers.indexOf("Start date");
+            const endIndex = headers.indexOf("End date");
+            
+            let data = bodyRange.values;
+
+            // Simple Math Setup
+            const startDates = data.map(row => new Date(row[startIndex]));
+            const endDates = data.map(row => new Date(row[endIndex]));
+            const projectStart = new Date(Math.min(...startDates));
+            const projectEnd = new Date(Math.max(...endDates));
+            const totalDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
+            const pxPerDay = canvas.width / totalDays;
+
+            console.log('pxPerDay: ' + pxPerDay);
         });
     } catch (error) {
         console.error(error);
