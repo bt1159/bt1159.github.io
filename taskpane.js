@@ -148,7 +148,13 @@ function drawCenteredLabel(ctx, text, centerX, centerY, rectWidth, rectHeight, r
     ctx.fillText(text, centerX, centerY);
 }
 
-async function getTableData() {
+const LabelLayout = Object.freeze({
+    FLOATING: { align: 'center', offset: 0 },
+    RIGHT:  { align: 'left',   offset: 10 }, // 10px to the right of the bar end
+    LEFT:   { align: 'right',  offset: -10 } // 10px to the left of the bar start
+});
+
+async function createChart() {
     try {
 
         await Excel.run(async (context) => {
@@ -191,29 +197,26 @@ async function getTableData() {
             const startIndex = headers.indexOf("Start date");
             const endIndex = headers.indexOf("End date");
             const titleIndex = headers.indexOf("Title");
-            
             let data = bodyRange.values;
-            const ganttBottom = templateHeight * data.length;
 
-            // Canvas math
-            
-
-            // Simple Math Setup
             const types = data.map(row => row[typeIndex]);
             const startDates = data.map(row => new Date(excelDateToJS(row[startIndex])));
             const endDates = data.map(row => new Date(excelDateToJS(row[endIndex])));
             const titles = data.map(row => row[titleIndex]);
-            const projectStart = new Date(Math.min(...startDates));
-            const projectEnd = new Date(Math.max(...endDates));
-            const rangeStart = new Date(projectStart.getFullYear(),projectStart.getMonth(),1);
-            // rangeEnd will always be the last day of the month in which projectEnd falls
-            const rangeEnd = new Date(projectEnd.getFullYear(), projectEnd.getMonth() + 1, 0);
-            const totalDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
-            ctx.font = "14px Arial";
-            let maxTimestamps = data.map((row, index) => Math.max(
+            const maxTimestamps = data.map((row, index) => Math.max(
                 (startDates[index] instanceof Date && !isNaN(startDates[index])) ? startDates[index].getTime() : 0,
                 (endDates[index] instanceof Date && !isNaN(endDates[index])) ? endDates[index].getTime() : 0
             ));
+
+            // Figure out scope of data
+            const projectStart = new Date(Math.min(...startDates));
+            const projectEnd = new Date(Math.max(...maxTimestamps));
+            // rangeStart will always be the first of the month that contains projectStart.  rangeStart could equal projectStart.
+            const rangeStart = new Date(projectStart.getFullYear(),projectStart.getMonth(),1);
+            // rangeEnd will always be the last day of the month in which projectEnd falls.  They could be equal.
+            const rangeEnd = new Date(projectEnd.getFullYear(), projectEnd.getMonth() + 1, 0);
+            const totalDays = (rangeEnd - rangeStart) / (1000 * 60 * 60 * 24);
+            ctx.font = "14px Arial";
             const availablePixels = data.map((row, index) => {
                 if (types[index] == "Activity") {
                     return (canvas.width - ctx.measureText(row[titleIndex]).width - 2 * buffer - 5);
@@ -238,6 +241,9 @@ async function getTableData() {
             console.log('monthDiff: ' + monthDiff);
             const noMonths = (yearDiff * 12) + monthDiff;
             console.log('noMonths: ' + noMonths);
+
+            
+            const ganttBottom = templateHeight * data.length;
 
             // Draw monthly gridlines and titles at bottom
             for (let m = 0; m <= noMonths; m++) {
@@ -335,6 +341,219 @@ async function getTableData() {
                     } else {
                         ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
                     }
+
+                } else if (types[index] == "Milestone") {
+                    const taskStart = new Date(excelDateToJS(row[startIndex]));
+                    const size = size0;
+                    const x = (taskStart - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer - (size / 2);
+                    const y = index * templateHeight; // 30px height per row
+                    drawDiamond(ctx,x,y,size,"orange");
+                    // drawHLine(ctx,y,"red");
+                    
+                    // Draw the label
+                    ctx.font = "14px Arial";
+                    ctx.textBaseline = "middle";
+                    ctx.textAlign = "left";
+                    const title = row[titleIndex];
+                    const metrics = ctx.measureText(title);
+                    const textWidth = metrics.width;
+                    const textHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+                    const textY = y + size0 / 2;
+                    let textX;
+                    if (x + size + 5 + textWidth < ctx.canvas.width) {
+                        textX = x + size + 5;
+                    } else if (textWidth + 5 < x) {
+                        textX = x - textWidth - 5;
+                    } else {
+                        textX = ctx.canvas.width - textWidth;
+                    }
+                    ctx.fillStyle = "rgba(255,255,255,0.5)";
+                    ctx.fillRect(textX, textY - textHeight / 2, textWidth, textHeight);
+                    ctx.fillStyle = "rgb(0,0,0)";
+                    ctx.fillText(title, textX, textY);
+
+                }
+            });
+            
+
+            // Convert to image and push to Excel
+            const image = canvas.toDataURL("image/png").replace(/^data:image\/(png|jpg);base64,/, "");
+            sheet.shapes.addImage(image);
+            await context.sync();
+        });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+
+async function createChart2() {
+    try {
+        await Excel.run(async (context) => {
+        
+            // Read data from table
+            let sheet = context.workbook.worksheets.getActiveWorksheet();
+            let dateTable = sheet.tables.getItemAt(0);
+            let headerRange = dateTable.getHeaderRowRange().load("values");
+            let bodyRange = dateTable.getDataBodyRange().load("values");
+
+            // Sync to populate proxy objects with data from Excel.
+            await context.sync();
+
+            // Define table/graphic basic parameters
+            const size0 = 20;
+            const buffer = size0;
+            const lineBuffer = 5;
+            const templateHeight = size0 + lineBuffer;
+            const canvas = document.getElementById("myCanvas");
+            const ctx = canvas.getContext("2d");
+
+            // Process table data into usable arrays
+            const headers = headerRange.values[0];
+            const typeIndex = headers.indexOf("Type");
+            const startIndex = headers.indexOf("Start date");
+            const endIndex = headers.indexOf("End date");
+            const titleIndex = headers.indexOf("Title");
+            let data = bodyRange.values;
+            const types = data.map(row => row[typeIndex]);
+            const startDates = data.map(row => new Date(excelDateToJS(row[startIndex])));
+            const endDates = data.map(row => new Date(excelDateToJS(row[endIndex])));
+            const titles = data.map(row => row[titleIndex]);
+            // This returns for each row, whichever is more, the startDate plus 1 or the endDate.
+            const maxTimestamps = data.map((row, index) => Math.max(
+                (startDates[index] instanceof Date && !isNaN(startDates[index])) ? (new Date(startDates[index]).setDate((startDates[index]).getDate() + 1)) : 0,
+                (endDates[index] instanceof Date && !isNaN(endDates[index])) ? endDates[index].getTime() : 0
+            ));
+
+            // Calculating scope of data
+            const projectStart = new Date(Math.min(...startDates));
+            const projectEnd = new Date(Math.max(...maxTimestamps));
+            // rangeStart will always be the first of the month that contains projectStart.  They could be equal.
+            const rangeStart = new Date(projectStart.getFullYear(),projectStart.getMonth(),1);
+            // rangeEnd will always be the first day of the month after the month in which projectEnd falls unless projectEnd is the first of the month.
+            const rangeEnd = new Date(projectEnd.getFullYear(), projectEnd.getDate() == 1 ? projectEnd.getMonth() : projectEnd.getMonth() + 1, 1);
+            const totalProjectDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
+            const totalDays = (rangeEnd - rangeStart) / (1000 * 60 * 60 * 24);
+            const ganttBottom = templateHeight * data.length;
+            const ganttWidth = canvas.width - 2 * buffer;
+            const pxPerDay = ganttWidth / totalDays;
+            const yearDiff = rangeEnd.getFullYear() - rangeStart.getFullYear();
+            const monthDiff = rangeEnd.getMonth() - rangeStart.getMonth() + 1;
+            const noMonths = (yearDiff * 12) + monthDiff;
+
+            // Draw monthly gridlines and titles at bottom
+            for (let m = 0; m < noMonths; m++) {
+                //Draw monthly gridlines
+                const month = rangeStart.getMonth() + m;
+                const thisDate = new Date(rangeStart.getFullYear(),month,1);
+                const x = (thisDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                const width = month == 12 ? 2 : 1;
+                const color = month == 12 ? "rgb(0, 0, 0)" : "rgb(180, 180, 180)";
+                drawVLine(ctx,x,0,ganttBottom, color, width);
+
+                // Draw label at bottom
+                if (m < noMonths - 1) {
+                    const monthAbbr = thisDate.toLocaleString('en-US', { month: 'short' });
+                    const nextMDate = new Date(rangeStart.getFullYear(),month + 1,1);
+                    const nextX = (nextMDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                    const rectWidth = nextX - x;
+                    const rectHeight = size0;
+                    const centerX = (nextX + x) / 2;
+                    const centerY = ganttBottom + rectHeight / 2;
+                    drawCenteredLabel(ctx,monthAbbr, centerX, centerY, rectWidth, rectHeight, "rgb(180,180,180)","rgb(90,90,90)");
+                }
+            }
+
+            // Draw yearly titles at bottom
+            for (let y = 0; y < yearDiff + 1; y++) {
+                const yearLabel = projectStart.getFullYear() + y;
+                let thisDate;
+                let nextDate;
+                if (y == 0) {
+                    thisDate = rangeStart;
+                } else {
+                    thisDate = new Date(yearLabel,0,1);
+                }
+                if (y < yearDiff) {
+                    nextDate = new Date(yearLabel + 1,0,1);
+                } else {
+                    nextDate = new Date(rangeEnd);
+                }
+                const x = (thisDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                const nextX = (nextDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                const rectWidth = nextX - x;
+                const rectHeight = size0;
+                const centerX = (nextX + x) / 2;
+                const centerY = ganttBottom + rectHeight + rectHeight / 2;
+                drawCenteredLabel(ctx,yearLabel, centerX, centerY, rectWidth, rectHeight, "rgb(180,180,180)","rgb(90,90,90)");
+             }
+            
+            // Draw red line for today
+            if ( new Date() > rangeStart && new Date() < rangeEnd) {
+                const thisDate = new Date();
+                console.log('thisDate: ' + thisDate);
+                console.log('thisDate > rangeStart: ' + (thisDate > rangeStart));
+                const x = (thisDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                const width = 2;
+                const color = "rgb(255, 0, 0)";
+                drawVLine(ctx,x,0,ganttBottom, color, width);
+            } else {
+                const thisDate = new Date();
+                console.log('thisDate: ' + thisDate);
+                console.log('thisDate > rangeStart: ' + (thisDate > rangeStart));
+                console.log('rangeStart: ' + rangeStart);
+            }
+
+
+            // Draw each task
+            data.forEach((row, index) => {
+                if (types[index] == "Activity") {
+                    const taskStart = new Date(excelDateToJS(row[startIndex]));
+                    const taskEnd = new Date(excelDateToJS(row[endIndex]));
+                    const duration = (taskEnd - taskStart) / (1000 * 60 * 60 * 24);
+
+                    
+                    const x = (taskStart - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                    const y = index * templateHeight; // 30px height per row
+                    const width = duration * pxPerDay;
+
+                    
+                    // Draw the label
+                    ctx.font = "14px Arial";
+                    ctx.textBaseline = "middle";
+                    ctx.textAlign = "left";
+                    const title = row[titleIndex];
+                    const metrics = ctx.measureText(title);
+                    const textWidth = metrics.width;
+                    const textHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+                    let textX;
+                    const textY =  y + size0 / 2;
+                    if (x + width + 5 + textWidth < ganttWidth) {
+                        // ctx.fillText(title, x + width + 5, y + size0 / 2);
+                        textX = x + width + 5;
+                    } else if (textWidth + 5 < x) {
+                        // ctx.fillText(title, x - textWidth - 5, y + size0 / 2);
+                        textX = x - textWidth - 5;
+                    } else if (width >= textWidth + 2 * 5) {
+                        // ctx.fillText(title, x + 5, y + size0 / 2);
+                        textX = x + 5;
+                    } else {
+                        // ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
+                        textX = ganttWidth - textWidth;
+                    }
+                    
+                    // Draw the label background
+                    ctx.fillStyle = "rgba(255,255,255,0.5)";
+                    ctx.fillRect(textX, textY - textHeight / 2, textWidth, textHeight);
+                    
+                    // Draw the bar
+                    ctx.fillStyle = "#217346"; // Excel Green
+                    ctx.fillRect(x, y, width, size0);
+                    
+                    // Draw the label
+                    ctx.fillStyle = "black";
+                    ctx.fillText(title, textX, textY);
+                    
 
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
