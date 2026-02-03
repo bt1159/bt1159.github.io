@@ -400,13 +400,16 @@ async function createChart2() {
             // Sync to populate proxy objects with data from Excel.
             await context.sync();
 
+            // Clear the previous drawings
+            const canvas = document.getElementById("myCanvas");
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
             // Define table/graphic basic parameters
             const size0 = 20;
             const buffer = size0;
             const lineBuffer = 5;
             const templateHeight = size0 + lineBuffer;
-            const canvas = document.getElementById("myCanvas");
-            const ctx = canvas.getContext("2d");
 
             // Process table data into usable arrays
             const headers = headerRange.values[0];
