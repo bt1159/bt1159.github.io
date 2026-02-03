@@ -107,6 +107,46 @@ function drawVLine(ctx, x, y0, y1, color, width) {
     ctx.closePath();
     ctx.stroke();
 }
+function drawCenteredLabel(ctx, text, centerX, centerY, rectWidth, rectHeight, rectColor, strokeColor) {
+    // 1. Draw the Rectangle (centered)
+    ctx.fillStyle = rectColor;
+    ctx.fillRect(centerX - rectWidth / 2, centerY - rectHeight / 2, rectWidth, rectHeight);
+
+    // 2. Draw the Border (Stroke)
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(centerX - rectWidth / 2, centerY - rectHeight / 2, rectWidth, rectHeight);
+
+    // 2. Configure Text Alignment
+    ctx.fillStyle = "white";
+    let fontSize = 14;
+    ctx.font = fontSize + "px Arial";
+    let success = ctx.measureText(text).width < rectWidth;
+    while (!success) {
+        if (fontSize <= 8) {
+            success = true;
+        } else {
+            fontSize--;
+            ctx.font = fontSize + "px Arial";
+            success = ctx.measureText(text).width < rectWidth
+        }
+    }
+    if (fontSize > 8) {
+        fontSize--;
+        ctx.font = fontSize + "px Arial";
+    }
+
+    console.log('fontSize: ' + fontSize);
+    console.log('ctx.measureText(text).width: ' + ctx.measureText(text).width);
+    console.log('rectWidth: ' + rectWidth);
+    
+    // These two lines are the "magic" for centering
+    ctx.textAlign = "center";     // Horizontal center
+    ctx.textBaseline = "middle";  // Vertical center
+
+    // 3. Draw the text at the EXACT same center point
+    ctx.fillText(text, centerX, centerY);
+}
 
 async function getTableData() {
     try {
@@ -166,7 +206,8 @@ async function getTableData() {
             const projectStart = new Date(Math.min(...startDates));
             const projectEnd = new Date(Math.max(...endDates));
             const rangeStart = new Date(projectStart.getFullYear(),projectStart.getMonth(),1);
-            const rangeEnd = projectEnd.getDate() == 1 ? new Date(projectEnd) : new Date(projectEnd.getFullYear(),projectEnd.getMonth() + 1,1);
+            // rangeEnd will always be the last day of the month in which projectEnd falls
+            const rangeEnd = new Date(projectEnd.getFullYear(), projectEnd.getMonth() + 1, 0);
             const totalDays = (projectEnd - projectStart) / (1000 * 60 * 60 * 24);
             ctx.font = "14px Arial";
             let maxTimestamps = data.map((row, index) => Math.max(
@@ -186,6 +227,10 @@ async function getTableData() {
             const theoreticalPxPerDay = availablePixels.map((row, index) => row / requiredDayWidth[index]);
             const pxPerDay = Math.min(...theoreticalPxPerDay);
 
+            //I think there is a problem where the pxPerDay gets based on the furthest point, which uses date and title.  The problem is 
+            // that this bases things off a date that is not the last of the month.  Won't this make the scale different for the labels
+            // at the bottom?
+
             console.log('projectEnd: ' + projectEnd);
             const yearDiff = rangeEnd.getFullYear() - rangeStart.getFullYear();
             console.log('yearDiff: ' + yearDiff);
@@ -194,21 +239,67 @@ async function getTableData() {
             const noMonths = (yearDiff * 12) + monthDiff;
             console.log('noMonths: ' + noMonths);
 
-            for (let m = 0; m < noMonths; m++) {
+            // Draw monthly gridlines and titles at bottom
+            for (let m = 0; m <= noMonths; m++) {
+                //Draw monthly gridlines
                 const month = rangeStart.getMonth() + m;
                 const thisDate = new Date(rangeStart.getFullYear(),month,1);
                 const x = (thisDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
                 const width = month == 12 ? 2 : 1;
                 const color = month == 12 ? "rgb(0, 0, 0)" : "rgb(180, 180, 180)";
                 drawVLine(ctx,x,0,ganttBottom, color, width);
+
+                // Draw label at bottom
+                if (m < noMonths) {
+                    const monthAbbr = thisDate.toLocaleString('en-US', { month: 'short' });
+                    const nextMDate = new Date(rangeStart.getFullYear(),month + 1,1);
+                    const nextX = (nextMDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                    const rectWidth = nextX - x;
+                    const rectHeight = size0;
+                    const centerX = (nextX + x) / 2;
+                    const centerY = ganttBottom + rectHeight / 2;
+                    drawCenteredLabel(ctx,monthAbbr, centerX, centerY, rectWidth, rectHeight, "rgb(180,180,180)","rgb(90,90,90)");
+                }
             }
 
-            if ( new Date().now > rangeStart && new Date().now < rangeEnd) {
-                const thisDate = new Date().now;
+            // Draw yearly titles at bottom
+            for (let y = 0; y < yearDiff + 1; y++) {
+                const yearLabel = projectStart.getFullYear() + y;
+                let thisDate;
+                let nextDate;
+                if (y == 0) {
+                    thisDate = rangeStart;
+                } else {
+                    thisDate = new Date(yearLabel,0,1);
+                }
+                if (y < yearDiff) {
+                    nextDate = new Date(yearLabel + 1,0,1);
+                } else {
+                    nextDate = new Date(rangeEnd);
+                }
                 const x = (thisDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
-                const width = 1;
+                const nextX = (nextDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                const rectWidth = nextX - x;
+                const rectHeight = size0;
+                const centerX = (nextX + x) / 2;
+                const centerY = ganttBottom + rectHeight + rectHeight / 2;
+                drawCenteredLabel(ctx,yearLabel, centerX, centerY, rectWidth, rectHeight, "rgb(180,180,180)","rgb(90,90,90)");
+             }
+            
+            // Draw red line for today
+            if ( new Date() > rangeStart && new Date() < rangeEnd) {
+                const thisDate = new Date();
+                console.log('thisDate: ' + thisDate);
+                console.log('thisDate > rangeStart: ' + (thisDate > rangeStart));
+                const x = (thisDate - rangeStart) / (1000 * 60 * 60 * 24) * pxPerDay + buffer;
+                const width = 2;
                 const color = "rgb(255, 0, 0)";
                 drawVLine(ctx,x,0,ganttBottom, color, width);
+            } else {
+                const thisDate = new Date();
+                console.log('thisDate: ' + thisDate);
+                console.log('thisDate > rangeStart: ' + (thisDate > rangeStart));
+                console.log('rangeStart: ' + rangeStart);
             }
 
 
@@ -233,6 +324,7 @@ async function getTableData() {
                     ctx.fillStyle = "black";
                     ctx.font = "14px Arial";
                     ctx.textBaseline = "middle";
+                    ctx.textAlign = "left";
                     const title = row[titleIndex];
                     const metrics = ctx.measureText(title);
                     const textWidth = metrics.width;
@@ -243,8 +335,6 @@ async function getTableData() {
                     } else {
                         ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
                     }
-                    
-                    // drawHLine(ctx,y + size0,"blue");
 
                 } else if (types[index] == "Milestone") {
                     const taskStart = new Date(excelDateToJS(row[startIndex]));
@@ -255,23 +345,30 @@ async function getTableData() {
                     // drawHLine(ctx,y,"red");
                     
                     // Draw the label
-                    ctx.fillStyle = "black";
                     ctx.font = "14px Arial";
                     ctx.textBaseline = "middle";
+                    ctx.textAlign = "left";
                     const title = row[titleIndex];
                     const metrics = ctx.measureText(title);
                     const textWidth = metrics.width;
+                    const textHeight = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+                    const textY = y + size0 / 2;
+                    let textX;
                     if (x + size + 5 + textWidth < ctx.canvas.width) {
-                        ctx.fillText(title, x + size + 5, y + size0 / 2);
+                        textX = x + size + 5;
                     } else if (textWidth + 5 < x) {
-                        ctx.fillText(title, x - textWidth - 5, y + size0 / 2);
+                        textX = x - textWidth - 5;
                     } else {
-                        ctx.fillText(title, ctx.canvas.width - textWidth, y + size0 / 2);
+                        textX = ctx.canvas.width - textWidth;
                     }
-                    // drawHLine(ctx,y + size0,"blue");
+                    ctx.fillStyle = "rgba(255,255,255,0.5)";
+                    ctx.fillRect(textX, textY - textHeight / 2, textWidth, textHeight);
+                    ctx.fillStyle = "rgb(0,0,0)";
+                    ctx.fillText(title, textX, textY);
 
                 }
             });
+            
 
             // Convert to image and push to Excel
             const image = canvas.toDataURL("image/png").replace(/^data:image\/(png|jpg);base64,/, "");
