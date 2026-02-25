@@ -1,11 +1,180 @@
+/* The background overlay to prevent user interaction */
+#loading-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.7);
+  z-index: 10000;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* The Spinner Animation */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #0078d4; /* Office Blue */
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  margin-top: 15px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #323130;
+  font-weight: 600;
+}
 body {
-    font-family: sans-serif;
-    padding: 10px;
+  font-family: sans-serif;
+  padding: 10px;
 }
 button {
-    background-color: #0078d4;
-    color: white;
-    padding: 10px 15px;
-    border: none;
-    cursor: pointer;
+  background-color: #0078d4;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  cursor: pointer;
+}
+.input-section {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-group label {
+  font-family: "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #323130;
+}
+
+.input-group input {
+  padding: 6px;
+  border: 1px solid #8a8886;
+  border-radius: 2px;
+  font-size: 14px;
+  width: 100px;
+}
+
+.input-group input:focus {
+  border-color: #0078d4;
+  outline: none;
+}
+.action-links {
+  margin-top: 5px;
+  text-align: right;
+}
+
+.ms-Link {
+  background: none;
+  border: none;
+  color: #0078d4;
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.ms-Link:hover {
+  color: #005a9e;
+}
+
+.color-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* Style the actual picker input */
+input[type="color"] {
+  -webkit-appearance: none; /* For Safari/Older Edge/Chrome */
+  appearance: none; /* Modern standard property */
+  border: 1px solid #8a8886;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+  border-radius: 2px;
+}
+
+/* Target the inner swatch for Chrome/Edge */
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+/* The Hex text next to the picker */
+#color-hex-label {
+  font-family: "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: #605e5c;
+  text-transform: uppercase;
+}
+.error-toast {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #fde7e9; /* Light Red */
+  border-bottom: 2px solid #a80000;
+  padding: 12px;
+  z-index: 1000;
+  font-family: "Segoe UI", sans-serif;
+}
+.toast-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+#toast-link {
+  display: block;
+  margin-top: 8px;
+  color: #0078d4;
+  text-decoration: underline;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  gap: 8px; /* Spaces the box from the text */
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.checkbox-group input {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox-group label {
+  cursor: pointer;
+  user-select: none;
 }
