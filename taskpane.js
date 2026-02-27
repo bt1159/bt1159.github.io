@@ -93,10 +93,10 @@ Office.onReady(async function (info) {
     createChartButton.onclick = () => {
       // Grab values and enforce defaults if blank
       let valWidth =
-        widthInput.value === "" ? defaultChartWidth : Number(widthInput.value);
+        widthInput.value === "" ? helpers.chartConfiguration.defaultChartWidth : Number(widthInput.value);
       let valHeight =
         heightInput.value === ""
-          ? defaultTemplateHeight
+          ? helpers.chartConfiguration.defaultTemplateHeight
           : Number(heightInput.value);
 
       // Enforce Integers and "0 or Higher" rule Math.round handles decimals;
@@ -120,8 +120,8 @@ Office.onReady(async function (info) {
     };
 
     resetButton.onclick = () => {
-      widthInput.value = defaultChartWidth;
-      heightInput.value = defaultTemplateHeight;
+      widthInput.value = helpers.chartConfiguration.defaultChartWidth;
+      heightInput.value = helpers.chartConfiguration.defaultTemplateHeight;
       inputColorButton.value = "#ff7777";
       hexColorLabel.innerText = "#ff7777";
     };
@@ -143,514 +143,47 @@ Office.onReady(async function (info) {
   }
 });
 
-/**
- * @callback NameAndTrack
- * @param {any} shape
- * @param {string} suffix
- * @returns {string}
- */
-
-/**
- * @callback ClearAll
- * @param {any} context
- * @param {any} sheet
- * @returns {Promise<void>}
- */
-
-/**
- * @callback GroupAll
- * @param {any} shapesCollection
- * @returns {any|null}
- */
-
-/**
- * @typedef {Object} GanttManager
- * @property {number} sI
- * @property {Excel.Shape[]} shapesArray
- * @property {NameAndTrack} nameAndTrack
- * @property {ClearAll} clearAll
- * @property {GroupAll} groupAll
- */
-
-/**
- * @typedef {Object} Tick
- * @property {number} localX - the x position of the tick, from localX = 0,
- * which already takes into account anchorLeft and localXOffset.  SHOULD BE
- * ROUNDED.
- * @property {string} label - the label that should be used for that tick in the
- * axis.  For final tick, this is null.
- */
-
-/**
- * This object handles the naming of shapes, including the tracking of the sI
- * index, and adding them to the shapesArray group.
- * @type {GanttManager}
- */
-const ganttManager = {
-  sI: 0,
-  shapesArray: [],
-
-  // Your "extension-like" method
-  nameAndTrack: function (shape, suffix) {
-    const name = `GanttShape_${suffix}_${this.sI}`;
-    shape.name = name;
-
-    // Automatically track and increment
-    this.shapesArray.push(shape);
-    this.sI++;
-
-    return name;
-  },
-
-  // A single command to wipe the slate clean
-  clearAll: async function (context, sheet) {
-    const shapes = sheet.shapes;
-    shapes.load("items/name");
-    await context.sync();
-
-    // Collect ghosts and previous chart pieces in one go
-    const targets = shapes.items.filter((s) => s.name.startsWith("GanttShape"));
-    targets.forEach((s) => s.delete());
-
-    // Reset state for a new run
-    this.sI = 0;
-    this.shapesArray = [];
-
-    await context.sync();
-    console.log(`Cleanup complete. Removed ${targets.length} shapes.`);
-  },
-
-  groupAll: function (shapesCollection) {
-    if (this.shapesArray.length > 1) {
-      const group = shapesCollection.addGroup(this.shapesArray);
-      group.name = "GanttShapeGroup";
-
-      return group;
-    } else {
-      console.log("Not enough shapes to group.");
-      return null;
-    }
-  },
-};
-
-
-/**
- * Convert point size to pixels
- * @param {number} pt - A point size for fonts, shapes, etc.
- * @returns {number} - A size in pixels
- */
-function ptToPx(pt) {
-  // 1pt = 1/72 inch; CSS px assume 96 DPI => 96/72 px per pt
-  return pt * (96 / 72);
-}
-
-/**
- * Creates an html canvas element with the string and font given and returns the
- * width and height of the created text element.  This will then get used by
- * other functions to create Excel shapes that have the appropriate width &
- * height, in lieu of an appropriate auto-sizing ability.
- * @param {string} text
- * @param {string} cssFont
- * @returns {{width: number, height: number}} A size object in pixels. If
- * measuring fails, returns {width:0, height:0}.
- */
-function measureTextPx(text, cssFont) {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx)
-    return {
-      width: 0,
-      height: 0,
-    };
-  ctx.font = cssFont;
-  const m = ctx.measureText(text);
-  const preciseW =
-    (m.actualBoundingBoxLeft ?? 0) + (m.actualBoundingBoxRight ?? m.width);
-  const preciseH =
-    (m.actualBoundingBoxAscent ?? 0) + (m.actualBoundingBoxDescent ?? 0);
-  const output = {
-    width: Math.max(m.width, preciseW),
-    height: preciseH,
-  };
-  return output;
-}
-
-/**
- * Determines whether black or white text is more readable based on background
- * color.  If this is not great for very dark or very saturated colors, consider
- * using the more complex WCAG 2.1 "gamma correction" standard
- * @param {string} hexColor - The background color in Hex format (e.g.
- * "#FFFFFF")
- * @param {number} transparency - 0 (opaque) to 1 (transparent)
- * @returns {string} - the ideal text color in hex code (e.g. "#FFFFFF")
- */
-function getContrastColor(hexColor, transparency) {
-  // 1. Remove the # and parse the hex values
-  const hex = hexColor.replace("#", "");
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-
-  // 2. Calculate Alpha (Excel transparency 0 = Opaque, so Alpha = 1 - transparency)
-  const alpha = 1 - (Number(transparency) || 0);
-
-  // 3. Blend with White Background (RGB 255, 255, 255)
-  // Formula: (Color * Alpha) + (255 * (1 - Alpha))
-  const blendR = r * alpha + 255 * (1 - alpha);
-  const blendG = g * alpha + 255 * (1 - alpha);
-  const blendB = b * alpha + 255 * (1 - alpha);
-
-  // 2. Calculate relative luminance
-  // Values are divided by 255 to get them into the 0-1 range
-  const luminance = (0.2126 * blendR + 0.7152 * blendG + 0.0722 * blendB) / 255;
-
-  // 3. Return black for light backgrounds, white for dark
-  // 0.5 is the standard midpoint, but 0.6 is often better for "Office" aesthetics
-  return luminance > 0.5 ? "#000000" : "#FFFFFF";
-}
-
-/**
- * Function that takes the bounding dates and the width of the chart and returns
- * an array with the data needed to create the vertical monthly bars and the
- * corresponding monthly axis labels
- * @param {Date} start
- * @param {Date} end
- * @param {number} ganttWidth - the actual width of the Gantt chart, used to
- * calculate the spacing between ticks
- * @returns {Tick[]} - the information required for each tick: localX position
- * and label for the axis
- */
-function calculateMonthTicks(start, end, ganttWidth) {
-  const ticks = [];
-  const startTime = start.getTime();
-  const totalDuration = end.getTime() - startTime;
-  const pixelsPerMs = ganttWidth / (totalDuration || 1); // Avoid div by zero
-
-  let current = new Date(start);
-
-  while (current <= end) {
-    const elapsed = current.getTime() - startTime;
-    const xPos = Math.round(elapsed * pixelsPerMs);
-
-    ticks.push({
-      localX: isNaN(xPos) ? 0 : xPos,
-      label:
-        current == end
-          ? null
-          : current.toLocaleDateString("en-US", { month: "short" }),
-    });
-
-    current.setMonth(current.getMonth() + 1);
-  }
-  return ticks;
-}
-
-/**
- * Function that takes the bounding dates and the width of the chart and returns
- * an array with the data needed to create the vertical yearly bars and the
- * corresponding yearly axis labels
- * @param {Date} start
- * @param {Date} end
- * @param {number} ganttWidth - the actual width of the Gantt chart, used to
- * calculate the spacing between ticks
- * @returns {Tick[]} - the information required for each tick: localX position
- * and label for the axis
- */
-function calculateYearTicks(start, end, ganttWidth) {
-  const ticks = [];
-  const startTime = start.getTime();
-  const totalDuration = end.getTime() - startTime;
-  const pixelsPerMs = ganttWidth / (totalDuration || 1); // Avoid div by zero
-
-  let current = new Date(start);
-  let keepLooping = true;
-  const rangeWithinOneYear = start.getFullYear() == end.getFullYear();
-  let i = 0;
-
-  // What if all the same year?
-  while (keepLooping) {
-    if (i >= 10) keepLooping = false;
-    if (current > end) {
-      keepLooping = false;
-    } else if (
-      current.getFullYear() == end.getFullYear() &&
-      current.getMonth() == end.getMonth()
-    ) {
-      keepLooping = false;
-    } else if (rangeWithinOneYear) {
-      keepLooping = false;
-    }
-    const elapsed = Math.min(current.getTime(), end.getTime()) - startTime;
-    const xPos = Math.round(elapsed * pixelsPerMs);
-
-    ticks.push({
-      localX: isNaN(xPos) ? 0 : xPos,
-      label: !keepLooping
-        ? null
-        : current.toLocaleDateString("en-US", { year: "numeric" }),
-    });
-    const currentYear = current.getFullYear();
-    current = new Date(currentYear + 1, 0, 1);
-    i++;
-  }
-
-  return ticks;
-}
-
-/**
- * Function that takes the bounding dates and the width of the chart and returns
- * an array with the data needed to create the fiscal year axis labels.  Since
- * CTC fiscal year begins on July 1 of that calendar year, we can essentially
- * move certain dates six months later.
- * @param {Date} start
- * @param {Date} end
- * @param {number} ganttWidth - the actual width of the Gantt chart, used to
- * calculate the spacing between ticks
- * @returns {Tick[]} - the information required for each tick: localX position
- * and label for the axis
- */
-function calculateFiscalYearTicks(startTrue, endTrue, ganttWidth) {
-  const ticks = [];
-  const start = new Date(startTrue.setMonth(startTrue.getMonth() + 6));
-  const end = new Date(endTrue.setMonth(endTrue.getMonth() + 6));
-  const startTime = start.getTime();
-  const totalDuration = end.getTime() - startTime;
-  const pixelsPerMs = ganttWidth / (totalDuration || 1); // Avoid div by zero
-
-  let current = new Date(start);
-  let keepLooping = true;
-  const rangeWithinOneYear = start.getFullYear() == end.getFullYear();
-  let i = 0;
-
-  // What if all the same year?
-  while (keepLooping) {
-    if (i >= 10) keepLooping = false;
-    if (current > end) {
-      keepLooping = false;
-    } else if (
-      current.getFullYear() == end.getFullYear() &&
-      current.getMonth() == end.getMonth()
-    ) {
-      keepLooping = false;
-    } else if (rangeWithinOneYear) {
-      keepLooping = false;
-    }
-    const elapsed = Math.min(current.getTime(), end.getTime()) - startTime;
-    const xPos = Math.round(elapsed * pixelsPerMs);
-
-    let labelYear = null;
-    if (keepLooping) {
-      labelYearCode =
-        current.toLocaleDateString("en-US", { year: "numeric" }) % 100;
-    }
-
-    const label = !keepLooping ? null : "FY" + labelYearCode;
-
-    ticks.push({
-      localX: isNaN(xPos) ? 0 : xPos,
-      label: label,
-    });
-    const currentYear = current.getFullYear();
-    current = new Date(currentYear + 1, 0, 1);
-    i++;
-  }
-
-  return ticks;
-}
-
-
-/**
- * Multi-step validation function to test the input data and make sure it has
- * the correct types, columns, etc.
- * @param {[string[]]} headerValues - 2D array with one item.  That item is an
- * array of strings.  Those strings are the column headers.
- * @param {any[][]} bodyValues - 2D array of table values.  Each top-level
- * array item is an array that represents a row from the table.
- * @returns {string} - true means data is valid
- */
-function testData(headerValues, bodyValues) {
-  const headers = headerValues[0].map((header) => header.toLowerCase());
-
-  // Test that the correct headers are there.
-  const typeIndex = headers.indexOf("type");
-  if (typeIndex == -1) throw new GanttHeaderError("type");
-  const startIndex = headers.indexOf("start date");
-  if (startIndex == -1) throw new GanttHeaderError("start date");
-  const endIndex = headers.indexOf("end date");
-  if (endIndex == -1) throw new GanttHeaderError("end date");
-  if (!headers.includes("title")) throw new GanttHeaderError("title");
-  // NOTE: there is no need to test the title column since, in processedData, I
-  // am defining the label with: String(row[titleIndex]) || "Unnamed task". That
-  // way, even if the input cannot be converted to a string, it still will not
-  // fail.  It will just be replaced with "Unnamed task".
-
-  // Test the values in Type column
-  let firstProblem = bodyValues.findIndex(
-    (row) => !["Activity", "Milestone"].includes(row[typeIndex]),
-  );
-  if (firstProblem > -1)
-    throw new GanttDataTypeError(
-      firstProblem + 1,
-      "Type",
-      "'Activity' or 'Milestone'",
-    );
-
-  // Test the values in Start date column
-  firstProblem = bodyValues.findIndex(
-    (row) => typeof row[startIndex] !== "number",
-  );
-  if (firstProblem > -1)
-    throw new GanttDataTypeError(firstProblem + 1, "Start date", "a number");
-
-  // Test the values in End date column
-  firstProblem = bodyValues.findIndex(
-    (row) => row[typeIndex] == "Activity" && typeof row[endIndex] !== "number",
-  );
-  if (firstProblem > -1)
-    throw new GanttDataTypeError(firstProblem + 1, "End date", "a number");
-  return true;
-}
-
-/** Acts like an enum with the various options for the spacing of each Gantt bar
- * label */
-const LabelLayout = Object.freeze({
-  LEFT: { align: "right" },
-  RIGHT: { align: "left" },
-  INSIDE: { align: "center" },
-});
-
-/**
- * The default width to make the entire image.  This is the value that the input
- * field in the taskbar uses as its default, and it supercedes a blank submitted
- * value
- * @type {number}
- */
-const defaultChartWidth = 400;
-/**
- * The default height to make each Gantt chart bar or milestone.  This is the
- * value that the input field in the taskbar uses as its default, and it
- * supercedes a blank submitted value
- * @type {number}
- */
-const defaultTemplateHeight = 20;
-/**
- * The width of the border around the entire Gantt chart.
- * @type {number}
- */
-const chartBorderWidth = 1;
-/**
- * The portion of the width of the border that overlaps the internal area of the
- * background rectangle.  Moving to the right this many pixels gets you to the
- * chart local x = 0 point.  For decimal/integer precision, this is rounded.  It
- * is rounded up to ensure it is actually safe.
- * @type {number}
- */
-const chartBorderWidthInternalOnly = Math.ceil(chartBorderWidth / 2);
-/**
- * The horizontal offset between leftAnchor and localX = 0
- * @type {number}
- */
-const localXOffset = chartBorderWidthInternalOnly;
-/**
- * The vertical offset between topAnchor and localY = 0
- * @type {number}
- */
-const localYOffset = chartBorderWidthInternalOnly;
-/**
- * The horizontal gap between a Gantt bar and its label, if laid out that way.
- */
-const barLabelBuffer = 5;
-/**
- * Height of the axis labels
- * @type {number}
- */
-const scaleAxisHeight = 20;
-/**
- * Stroke weight for borders of chart shapes excluding the border around the entire chart.
- * @type {number}
- */
-const innerBorderWidth = 1;
-/**
- * Stroke weight for border around the entire chart.
- * @type {number}
- */
-const outerBorderWidth = 2;
-/**
- * Vertical padding inside the Gantt chart above the first bar and below
- * the last bar
- */
-const ganttTopBottomInternalPadding = 5;
-
-/**
- * Generates a fingerprint for the table based ONLY on 4 specific columns.
- * @param {Array<Array>} rawData - The 2D array from Excel (including headers).
- * @returns {Promise<string>} A SHA-256 hash string.
- */
-async function getTableFingerprint(rawData) {
-  const targetHeaders = ["type", "start date", "end date", "title"];
-  const headers = rawData[0].map((h) => h?.toString().trim().toLowerCase());
-
-  // 1. Find indices of our targets
-  const indices = targetHeaders.map((target) => headers.indexOf(target));
-
-  // 2. Build a normalized 2D array (skipping headers, picking only our 4 columns)
-  const normalizedData = rawData.slice(1).map((row) => {
-    return indices.map((i) => {
-      const val = row[i];
-      // We return the value exactly as is (case-sensitive)
-      // but we ensure null/undefined are treated as empty strings
-      return val !== undefined && val !== null ? val.toString() : "";
-    });
-  });
-
-  // 3. Convert to JSON and Hash
-  const jsonString = JSON.stringify(normalizedData);
-  const msgUint8 = new TextEncoder().encode(jsonString);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
-
-  // Convert buffer to hex string
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-const debouncedUpdate = debounce(checkTableAndRedraw, 500);
-
-function debounce(func, delay) {
+const debouncedUpdate = (function (func, delay) {
   let timeoutId;
   return (...args) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
+    if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
       func.apply(null, args);
     }, delay);
   };
-}
+})(checkTableAndRedraw, 500);
 
 async function checkTableAndRedraw() {
   try {
     await Excel.run(async (context) => {
-      console.log('got into await Excel.run() in checkTableAndRedraw');
+      console.log("got into await Excel.run() in checkTableAndRedraw");
       const table = context.workbook.tables.getItemAt(0);
       const range = table.getRange().load("values");
       const sheet = context.workbook.worksheets.getActiveWorksheet();
       const shapes = sheet.shapes;
       shapes.load("items");
       await context.sync();
-      
+
       const length = shapes.items.length;
 
-      console.log('passed first context.sync() in checkTableAndRedraw, and length is: ', length);
-      const newHash = await getTableFingerprint(range.values);
+      console.log(
+        "passed first context.sync() in checkTableAndRedraw, and length is: ",
+        length,
+      );
+      const newHash = await helpers.getTableFingerprint(range.values);
       const oldHash = localStorage.getItem("tableHash");
 
       if (newHash !== oldHash) {
         await handleReformatButtonClick();
 
-      console.log('passed await handleReformatButtonClick() in checkTableAndRedraw');
+        console.log(
+          "passed await handleReformatButtonClick() in checkTableAndRedraw",
+        );
         localStorage.setItem("tableHash", newHash);
       } else {
-        console.log('hashes are equal.  This means table data is equal, i.e., no data has changed.  Script will now exit');
+        console.log(
+          "hashes are equal.  This means table data is equal, i.e., no data has changed.  Script will now exit",
+        );
       }
     });
   } catch (error) {
@@ -665,6 +198,53 @@ async function checkTableAndRedraw() {
       GanttErrorHandler.handle(error);
     }
   }
+}
+
+async function handleReformatButtonClick() {
+  const geo = await getExistingChartGeometry();
+
+  console.log(
+    "passed await getExistingChartGeometry() in handleReformatButtonClick",
+  );
+  if (geo) {
+    await createGanttChart({
+      chartWidth: geo.width,
+      chartHeight: geo.height,
+      chartTop: geo.top,
+      chartLeft: geo.left,
+    });
+
+    console.log("passed await createGanttChart() in handleReformatButtonClick");
+  }
+}
+
+async function getExistingChartGeometry() {
+  return await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const shapes = sheet.shapes.load(
+      "items/name, items/top, items/left, items/width, items/height",
+    );
+
+    await context.sync();
+
+    const ganttShapeGroup = shapes.items.find((s) =>
+      s.name.startsWith("GanttShapeGroup"),
+    );
+    // GanttShapeGroup
+
+    if (!ganttShapeGroup) {
+      console.error("No existing Gantt group found to reformat.");
+      return null;
+    }
+
+    // Return the live dimensions the user manually set
+    return {
+      top: ganttShapeGroup.top,
+      left: ganttShapeGroup.left,
+      width: ganttShapeGroup.width,
+      height: ganttShapeGroup.height,
+    };
+  });
 }
 
 /**
@@ -710,7 +290,7 @@ async function createGanttChart({
    * any chart contents should have if they span the entire chart.
    * @type {number}
    */
-  const chartInternalSafeWidth = safeChartWidth - 2 * localXOffset;
+  const chartInternalSafeWidth = safeChartWidth - 2 * helpers.chartConfiguration.localXOffset;
   const barLabelMarginPtLeft = 0;
   const barLabelMarginPtRight = 0;
   const barLabelMarginPtTop = 0;
@@ -832,8 +412,8 @@ async function createGanttChart({
     borderSize,
   ) {
     // Ensure we are sending absolute numbers, not strings or undefined
-    const safeLeft = (Number(left) || 0) + localXOffset + anchorLeft;
-    const safeTop = (Number(top) || 0) + localYOffset + anchorTop;
+    const safeLeft = (Number(left) || 0) + helpers.chartConfiguration.localXOffset + anchorLeft;
+    const safeTop = (Number(top) || 0) + helpers.chartConfiguration.localYOffset + anchorTop;
     const safeWidth = Math.max(Number(width), 1); // Width can't be 0
     const safeHeight = Number(height) || 1;
     const safeTransparency = Math.min(
@@ -859,7 +439,7 @@ async function createGanttChart({
     } else {
       shape.lineFormat.visible = false;
     }
-    ganttManager.nameAndTrack(shape, nameSuffix);
+    helpers.ganttManager.nameAndTrack(shape, nameSuffix);
     return shape;
   }
 
@@ -900,8 +480,8 @@ async function createGanttChart({
     // To keep it proportional (a "square" diamond), set width = height
     const safeSize = Math.max(Math.round(height) || 0, 1);
     const safeLeft =
-      (Number(left) || 0) - safeSize / 2 + localXOffset + anchorLeft;
-    const safeTop = (Number(top) || 0) + localYOffset + anchorTop;
+      (Number(left) || 0) - safeSize / 2 + helpers.chartConfiguration.localXOffset + anchorLeft;
+    const safeTop = (Number(top) || 0) + helpers.chartConfiguration.localYOffset + anchorTop;
 
     shape.left = safeLeft;
     shape.top = safeTop;
@@ -927,7 +507,7 @@ async function createGanttChart({
       shape.lineFormat.visible = false;
     }
 
-    ganttManager.nameAndTrack(shape, nameSuffix);
+    helpers.ganttManager.nameAndTrack(shape, nameSuffix);
     return shape;
   }
 
@@ -969,8 +549,8 @@ async function createGanttChart({
     borderColor,
     borderSize,
   ) {
-    const safeLeft = (Number(left) || 0) + localXOffset + anchorLeft;
-    const safeTop = (Number(top) || 0) + localYOffset + anchorTop;
+    const safeLeft = (Number(left) || 0) + helpers.chartConfiguration.localXOffset + anchorLeft;
+    const safeTop = (Number(top) || 0) + helpers.chartConfiguration.localYOffset + anchorTop;
     const safeWidth = Number(width) || 0;
     const safeHeight = Number(height) || 0;
     const safeTransparency = Math.min(
@@ -1012,7 +592,7 @@ async function createGanttChart({
       shape.lineFormat.visible = false;
     }
 
-    ganttManager.nameAndTrack(shape, nameSuffix);
+    helpers.ganttManager.nameAndTrack(shape, nameSuffix);
     return shape;
   }
 
@@ -1054,43 +634,49 @@ async function createGanttChart({
     fillTransparency,
     nameSuffix,
   ) {
-    const safeLeft = (Number(left) || 0) + localXOffset + anchorLeft;
+    const safeLeft = (Number(left) || 0) + helpers.chartConfiguration.localXOffset + anchorLeft;
     const cssFont = `${barLabelBold ? "bold " : ""}${fontSizePx}px ${fontName}`;
     const safeTransparency = Math.min(
       Math.max(Number(fillTransparency) || 0, 0),
       1,
     );
-    const safeBarLeft = (Number(barLeft) || 0) + localXOffset + anchorLeft;
+    const safeBarLeft = (Number(barLeft) || 0) + helpers.chartConfiguration.localXOffset + anchorLeft;
 
     // Measure the text size in pixels
-    const textPxSize = measureTextPx(text, cssFont);
+    const textPxSize = helpers.measureTextPx(text, cssFont);
     const textPx = textPxSize.width;
     const textPxH = textPxSize.height;
 
     // Convert margins to pixels
-    const marginPxW = ptToPx(barLabelMarginPtLeft + barLabelMarginPtRight);
-    const marginPxH = ptToPx(barLabelMarginPtTop + barLabelMarginPtBottom);
+    const marginPxW = helpers.ptToPx(
+      barLabelMarginPtLeft + barLabelMarginPtRight,
+    );
+    const marginPxH = helpers.ptToPx(
+      barLabelMarginPtTop + barLabelMarginPtBottom,
+    );
 
     const targetWidthPx = Math.ceil(textPx + marginPxW + safetyPxLabel);
     const targetHeightPx =
       textPxH == 0
-        ? ptToPx(fontSizePx) + ptToPx(topMarginPt + bottomMarginPt) + 10
+        ? helpers.ptToPx(fontSizePx) +
+          helpers.ptToPx(topMarginPt + bottomMarginPt) +
+          10
         : Math.ceil(textPxH + marginPxH + safetyPxLabel);
 
     let labelLayout;
 
     if (
-      safeLeft + targetWidthPx - localXOffset - anchorLeft <=
+      safeLeft + targetWidthPx - helpers.chartConfiguration.localXOffset - anchorLeft <=
       chartInternalSafeWidth
     ) {
-      labelLayout = LabelLayout.RIGHT;
+      labelLayout = helpers.LabelLayout.RIGHT;
     } else if (
       targetWidthPx <
-      safeBarLeft - barLabelBuffer - localXOffset - anchorLeft
+      safeBarLeft - helpers.chartConfiguration.barLabelBuffer - helpers.chartConfiguration.localXOffset - anchorLeft
     ) {
-      labelLayout = LabelLayout.LEFT;
+      labelLayout = helpers.LabelLayout.LEFT;
     } else {
-      labelLayout = LabelLayout.INSIDE;
+      labelLayout = helpers.LabelLayout.INSIDE;
     }
 
     // Create the textbox with empty text first (prevents early layout issues)
@@ -1101,20 +687,20 @@ async function createGanttChart({
     shape.textFrame.topMargin = barLabelMarginPtTop;
     shape.textFrame.bottomMargin = barLabelMarginPtBottom;
 
-    const barTopCenterLine = barTop + barHeight / 2 + anchorTop + localYOffset;
+    const barTopCenterLine = barTop + barHeight / 2 + anchorTop + helpers.chartConfiguration.localYOffset;
     shape.top = Math.max(barTopCenterLine - targetHeightPx / 2, 0);
     switch (labelLayout) {
-      case LabelLayout.RIGHT:
+      case helpers.LabelLayout.RIGHT:
         shape.left = safeLeft;
         shape.textFrame.horizontalAlignment =
           Excel.ShapeTextHorizontalAlignment.left;
         break;
-      case LabelLayout.LEFT:
-        shape.left = safeBarLeft - targetWidthPx - barLabelBuffer;
+      case helpers.LabelLayout.LEFT:
+        shape.left = safeBarLeft - targetWidthPx - helpers.chartConfiguration.barLabelBuffer;
         shape.textFrame.horizontalAlignment =
           Excel.ShapeTextHorizontalAlignment.right;
         break;
-      case LabelLayout.INSIDE:
+      case helpers.LabelLayout.INSIDE:
         shape.left = safeBarLeft;
         shape.textFrame.horizontalAlignment =
           Excel.ShapeTextHorizontalAlignment.center;
@@ -1126,8 +712,8 @@ async function createGanttChart({
 
     // IMPORTANT: set width BEFORE setting text
     shape.width =
-      labelLayout == LabelLayout.INSIDE
-        ? safeLeft - barLabelBuffer - safeBarLeft
+      labelLayout == helpers.LabelLayout.INSIDE
+        ? safeLeft - helpers.chartConfiguration.barLabelBuffer - safeBarLeft
         : targetWidthPx;
 
     // Set a reasonable height (Excel will expand if needed, but we aim for one
@@ -1144,16 +730,16 @@ async function createGanttChart({
     shape.textFrame.textRange.text = text;
     shape.textFrame.verticalAlignment = Excel.ShapeTextVerticalAlignment.middle;
 
-    const labelOverBackgroundColor = getContrastColor(
+    const labelOverBackgroundColor = helpers.getContrastColor(
       fillColor ?? "#FFFFFF",
       safeTransparency,
     );
-    const labelOverActivityColor = getContrastColor(defaultColor, 0);
+    const labelOverActivityColor = helpers.getContrastColor(defaultColor, 0);
     const labelColorsSame = labelOverBackgroundColor == labelOverActivityColor;
 
     switch (labelLayout) {
-      case LabelLayout.RIGHT:
-      case LabelLayout.LEFT:
+      case helpers.LabelLayout.RIGHT:
+      case helpers.LabelLayout.LEFT:
         if (fillColor) {
           shape.fill.setSolidColor(fillColor);
           shape.fill.transparency = safeTransparency;
@@ -1162,16 +748,16 @@ async function createGanttChart({
           shape.fill.clear();
         }
         break;
-      case LabelLayout.INSIDE:
+      case helpers.LabelLayout.INSIDE:
         shape.fill.clear();
-        labelTextColor = getContrastColor(defaultColor, 0);
+        labelTextColor = helpers.getContrastColor(defaultColor, 0);
         shape.textFrame.textRange.font.color = labelTextColor;
         break;
     }
 
     shape.lineFormat.visible = false;
 
-    ganttManager.nameAndTrack(shape, nameSuffix);
+    helpers.ganttManager.nameAndTrack(shape, nameSuffix);
     return shape;
   }
 
@@ -1201,10 +787,10 @@ async function createGanttChart({
     color,
     nameSuffix,
   ) {
-    const sL = (Number(startLeft) || 0) + localXOffset + anchorLeft;
-    const sT = (Number(startTop) || 0) + localYOffset + anchorTop;
-    const eL = (Number(endLeft) || 0) + localXOffset + anchorLeft;
-    const eT = (Number(endTop) || 0) + localYOffset + anchorTop;
+    const sL = (Number(startLeft) || 0) + helpers.chartConfiguration.localXOffset + anchorLeft;
+    const sT = (Number(startTop) || 0) + helpers.chartConfiguration.localYOffset + anchorTop;
+    const eL = (Number(endLeft) || 0) + helpers.chartConfiguration.localXOffset + anchorLeft;
+    const eT = (Number(endTop) || 0) + helpers.chartConfiguration.localYOffset + anchorTop;
 
     const shape = shapes.addLine(sL, sT, eL, eT);
 
@@ -1213,7 +799,7 @@ async function createGanttChart({
     shape.lineFormat.weight = wt;
     shape.lineFormat.color = color || "black";
 
-    ganttManager.nameAndTrack(shape, nameSuffix);
+    helpers.ganttManager.nameAndTrack(shape, nameSuffix);
     return shape;
   }
 
@@ -1223,7 +809,7 @@ async function createGanttChart({
     await Excel.run(async (context) => {
       // File setup
       const sheet = context.workbook.worksheets.getActiveWorksheet();
-      await ganttManager.clearAll(context, sheet);
+      await helpers.ganttManager.clearAll(context, sheet);
       const shapes = sheet.shapes;
       shapes.load("items/name");
       await context.sync();
@@ -1246,7 +832,7 @@ async function createGanttChart({
       const bodyRange = dateTable.getDataBodyRange().load("values");
       await context.sync();
 
-      testData(headerRange.values, bodyRange.values);
+      helpers.testData(headerRange.values, bodyRange.values);
 
       // Process table data into usable arrays
       const headers = headerRange.values[0].map((header) =>
@@ -1262,7 +848,7 @@ async function createGanttChart({
       if (chartHeight) {
         initialSafeTemplateHeight = Math.round(
           (chartHeight -
-            (2 * ganttTopBottomInternalPadding + 2 * scaleAxisHeight)) /
+            (2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding + 2 * helpers.chartConfiguration.scaleAxisHeight)) /
             data.length,
         );
       } else if (templateHeight) {
@@ -1328,10 +914,18 @@ async function createGanttChart({
       const ganttWidth = chartInternalSafeWidth;
       const pxPerM = ganttWidth / totalMs;
 
-      const monthTicks = calculateMonthTicks(rangeStart, rangeEnd, ganttWidth);
-      const yearTicks = calculateYearTicks(rangeStart, rangeEnd, ganttWidth);
+      const monthTicks = helpers.calculateMonthTicks(
+        rangeStart,
+        rangeEnd,
+        ganttWidth,
+      );
+      const yearTicks = helpers.calculateYearTicks(
+        rangeStart,
+        rangeEnd,
+        ganttWidth,
+      );
       const fiscalYearTicks = includeFY
-        ? calculateFiscalYearTicks(rangeStart, rangeEnd, ganttWidth)
+        ? helpers.calculateFiscalYearTicks(rangeStart, rangeEnd, ganttWidth)
         : null;
 
       // Map raw Excel rows into "Widget-ready" objects
@@ -1352,7 +946,7 @@ async function createGanttChart({
           type: row[typeIndex],
           localX: isNaN(xVal) ? 0 : xVal,
           width: wVal,
-          localY: index * safeTemplateHeight + ganttTopBottomInternalPadding,
+          localY: index * safeTemplateHeight +  helpers.chartConfiguration.ganttTopBottomInternalPadding,
         };
       });
 
@@ -1363,9 +957,9 @@ async function createGanttChart({
         0,
         safeChartWidth,
         safeTemplateHeight * processedData.length +
-          2 * ganttTopBottomInternalPadding +
-          2 * scaleAxisHeight +
-          (includeFY ? scaleAxisHeight : 0),
+          2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding +
+          2 * helpers.chartConfiguration.scaleAxisHeight +
+          (includeFY ? helpers.chartConfiguration.scaleAxisHeight : 0),
         "#FFFFFF",
         0,
         "BackgroundRect",
@@ -1379,8 +973,8 @@ async function createGanttChart({
           0,
           tick.localX,
           safeTemplateHeight * processedData.length +
-            2 * ganttTopBottomInternalPadding,
-          innerBorderWidth,
+            2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding,
+          helpers.chartConfiguration.innerBorderWidth,
           "#DDDDDD",
           0,
           "MonthlyTickLine",
@@ -1402,16 +996,16 @@ async function createGanttChart({
             tick.label,
             currentX,
             safeTemplateHeight * processedData.length +
-              2 * ganttTopBottomInternalPadding,
+              2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding,
             labelWidth,
-            scaleAxisHeight,
+            helpers.chartConfiguration.scaleAxisHeight,
             8,
             axisLabelBold,
             "#FFFFFF",
             0,
             "AxisMonthLabel",
             "#000000",
-            innerBorderWidth,
+            helpers.chartConfiguration.innerBorderWidth,
           );
         }
       });
@@ -1424,9 +1018,9 @@ async function createGanttChart({
           0,
           tick.localX,
           safeTemplateHeight * processedData.length +
-            2 * ganttTopBottomInternalPadding +
-            scaleAxisHeight,
-          innerBorderWidth,
+            2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding +
+            helpers.chartConfiguration.scaleAxisHeight,
+          helpers.chartConfiguration.innerBorderWidth,
           "#000000",
           0,
           "YearlyTickLine",
@@ -1448,17 +1042,17 @@ async function createGanttChart({
             tick.label,
             currentX,
             safeTemplateHeight * processedData.length +
-              2 * ganttTopBottomInternalPadding +
-              scaleAxisHeight,
+              2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding +
+              helpers.chartConfiguration.scaleAxisHeight,
             labelWidth,
-            scaleAxisHeight,
+            helpers.chartConfiguration.scaleAxisHeight,
             8,
             axisLabelBold,
             "#FFFFFF",
             0,
             "AxisYearLabel",
             "#000000",
-            innerBorderWidth,
+            helpers.chartConfiguration.innerBorderWidth,
           );
         }
       });
@@ -1479,17 +1073,17 @@ async function createGanttChart({
               tick.label,
               currentX,
               safeTemplateHeight * processedData.length +
-                2 * ganttTopBottomInternalPadding +
-                2 * scaleAxisHeight,
+                2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding +
+                2 * helpers.chartConfiguration.scaleAxisHeight,
               labelWidth,
-              scaleAxisHeight,
+              helpers.chartConfiguration.scaleAxisHeight,
               8,
               axisLabelBold,
               "#FFFFFF",
               0,
               "AxisYearLabel",
               "#000000",
-              innerBorderWidth,
+              helpers.chartConfiguration.innerBorderWidth,
             );
           }
         });
@@ -1511,7 +1105,7 @@ async function createGanttChart({
           0,
           todayX,
           safeTemplateHeight * processedData.length +
-            2 * ganttTopBottomInternalPadding,
+            2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding,
           2, // Slightly thicker
           "#FF0000", // Red
           "TodayLine",
@@ -1549,8 +1143,8 @@ async function createGanttChart({
           shapes,
           row.taskName,
           row.type == "Activity"
-            ? row.localX + row.width + barLabelBuffer
-            : row.localX + Math.ceil(size0 / 2) + barLabelBuffer,
+            ? row.localX + row.width + helpers.chartConfiguration.barLabelBuffer
+            : row.localX + Math.ceil(size0 / 2) + helpers.chartConfiguration.barLabelBuffer,
           row.localY,
           row.type == "Activity"
             ? row.localX
@@ -1570,14 +1164,14 @@ async function createGanttChart({
         0,
         safeChartWidth,
         safeTemplateHeight * processedData.length +
-          2 * ganttTopBottomInternalPadding +
-          2 * scaleAxisHeight +
-          (includeFY ? scaleAxisHeight : 0),
+          2 *  helpers.chartConfiguration.ganttTopBottomInternalPadding +
+          2 * helpers.chartConfiguration.scaleAxisHeight +
+          (includeFY ? helpers.chartConfiguration.scaleAxisHeight : 0),
         "#FFFFFF",
         1,
         "OuterBox",
         "#000000",
-        outerBorderWidth,
+         helpers.chartConfiguration.outerBorderWidth,
       );
 
       shapes.load("items/name, items/visible, items/zOrderPosition");
@@ -1603,7 +1197,7 @@ async function createGanttChart({
       });
 
       // Group shapes
-      ganttManager.groupAll(shapes);
+      helpers.ganttManager.groupAll(shapes);
 
       shapes.load("items/name, items/type");
       await context.sync();
@@ -1697,205 +1291,5 @@ async function runGanttDiagnostic() {
       }
     }
     console.log("---------------------------------------");
-  });
-}
-
-/**
- * Base class for all Gantt-related exceptions.
- * @extends Error
- */
-class GanttError extends Error {
-  /**
-   * @param {string} message - The error message.
-   */
-  constructor(message) {
-    super(message);
-    this.name = this.constructor.name;
-    this.helpUrl = "https://bt1159.github.io/HelpPage";
-  }
-}
-
-/**
- * Error thrown when a required column header is missing.
- * @extends GanttError
- */
-class GanttHeaderError extends GanttError {
-  /**
-   * @param {string} correctColumnName - The exact string name the column should have.
-   */
-  constructor(correctColumnName) {
-    super(
-      "Your table is missing a column called '" +
-        correctColumnName +
-        "'.  Case does not matter.",
-    );
-    this.name = this.constructor.name;
-    /** @type {string} */
-    this.correctColumnName = correctColumnName;
-  }
-}
-
-/**
- * Error thrown when a cell contains a value of the wrong type (e.g., text in a date column).
- * @extends GanttError
- */
-class GanttDataTypeError extends GanttError {
-  /**
-   * @param {number} row - The 1-based index of the row in the table.
-   * @param {string} columnName - The name of the column where the error occurred.
-   * @param {string} columnName - The name of the column where the error occurred.
-   */
-  constructor(row, columnName, correctType) {
-    super(
-      "Your table has data of the wrong type.  In the '" +
-        columnName +
-        "' column, in row " +
-        row +
-        " (1 is the top row).  It should be: " +
-        correctType +
-        ".",
-    );
-    this.name = this.constructor.name;
-    /** @type {number} */
-    this.row = row;
-    /** @type {string} */
-    this.columnName = columnName;
-    /** @type {string} */
-    this.correctType = correctType;
-  }
-}
-
-class GanttErrorHandler {
-  /**
-   * Centralized method to handle any error in the add-in
-   * @param {Error} error
-   */
-  static handle(error) {
-    // 1. Always log the full stack trace for the developer
-    console.error(`[DEBUG] Origin: ${error.name}\nStack:`, error.stack);
-    // Check for the "Cell Editing" error
-
-    if (error instanceof OfficeExtension.Error) {
-      // Now you are safe to check error.code
-      if (
-        error.code === "InvalidOperationInCellEditMode" ||
-        error.code === "HostIsBusy"
-      ) {
-        this.showToast(
-          "⚠️ Excel is Busy: Please press Enter or Esc to finish editing your cell, then try again.",
-          "https://support.microsoft.com/en-us/office/edit-cell-content-877ad3c5-950c-4df4-942b-58673f32488a",
-        );
-        return;
-      }
-    }
-
-    // 2. Decide how to notify the user
-    if (error instanceof GanttHeaderError) {
-      this.showDetailedAlert(error);
-    } else if (error instanceof GanttDataTypeError) {
-      this.showDetailedAlert(error);
-    } else if (error.name === "OfficeExtension.Error") {
-      this.handleExcelInternalError(error);
-    } else {
-      this.showGenericCrash(error);
-    }
-  }
-
-  static showToast(msg, url) {
-    const toast = document.getElementById("error-toast");
-    const messageEl = document.getElementById("toast-message");
-    const linkEl = document.getElementById("toast-link");
-
-    if (!toast || !messageEl) {
-      // Fallback if the HTML isn't ready or elements are missing
-      console.error("Toast elements not found in HTML:", msg);
-      return;
-    }
-
-    // Set the message
-    messageEl.innerText = msg;
-
-    // Set the link if provided, otherwise hide it
-    if (url) {
-      linkEl.href = url;
-      linkEl.style.display = "inline";
-    } else {
-      linkEl.style.display = "none";
-    }
-
-    // Make it visible
-    toast.style.display = "block";
-  }
-
-  static showDetailedAlert(error) {
-    const message = `📊 Data Issue: ${error.message}`;
-    this.showToast(message, error.helpUrl);
-  }
-
-  static highlightUIError(error) {
-    const el = document.getElementById(error.elementId);
-    if (el) {
-      el.style.border = "2px solid red";
-      setTimeout(() => (el.style.border = ""), 3000);
-    }
-    alert(`Input Error: ${error.message}`);
-  }
-
-  static handleExcelInternalError(error) {
-    console.error("Excel Error Code:", error.code);
-    // alert("Excel had trouble processing the request. Please try again.");
-  }
-
-  static showGenericCrash(error) {
-    console.error("Generic excel error", error.message);
-    console.error("code: ", error.code);
-    // alert(
-    //   "An unexpected error occurred. Please check the console for debugging info.",
-    // );
-  }
-}
-
-async function handleReformatButtonClick() {
-  const geo = await getExistingChartGeometry();
-
-      console.log('passed await getExistingChartGeometry() in handleReformatButtonClick');
-  if (geo) {
-    await createGanttChart({
-      chartWidth: geo.width,
-      chartHeight: geo.height,
-      chartTop: geo.top,
-      chartLeft: geo.left,
-    });
-    
-      console.log('passed await createGanttChart() in handleReformatButtonClick');
-  }
-}
-
-async function getExistingChartGeometry() {
-  return await Excel.run(async (context) => {
-    const sheet = context.workbook.worksheets.getActiveWorksheet();
-    const shapes = sheet.shapes.load(
-      "items/name, items/top, items/left, items/width, items/height",
-    );
-
-    await context.sync();
-
-    const ganttShapeGroup = shapes.items.find((s) =>
-      s.name.startsWith("GanttShapeGroup"),
-    );
-    // GanttShapeGroup
-
-    if (!ganttShapeGroup) {
-      console.error("No existing Gantt group found to reformat.");
-      return null;
-    }
-
-    // Return the live dimensions the user manually set
-    return {
-      top: ganttShapeGroup.top,
-      left: ganttShapeGroup.left,
-      width: ganttShapeGroup.width,
-      height: ganttShapeGroup.height,
-    };
   });
 }
